@@ -534,7 +534,12 @@ function boot(){
   const canvas = document.getElementById('stage');
   const area = document.getElementById('gameArea');
   W = Math.min(480, window.innerWidth);
-  H = area.clientHeight || Math.max(window.innerHeight - 60, 600);
+  // 锁定分辨率：预留80px给tune栏最大高度（3行wrap时约75px），避免选将后tune增高导致画布溢出
+  const hudEl = document.getElementById('hpHud');
+  const hudH = (hudEl && hudEl.offsetHeight > 0) ? hudEl.offsetHeight : 52;
+  H = Math.max(window.innerHeight - 80 - hudH, 600);
+  area.style.height = H + 'px';
+  area.style.flex = 'none'; // 防止flex在tune增高后压缩gameArea
   canvas.width = W; canvas.height = H;
 
   app = new PIXI.Application({ view:canvas, width:W, height:H,
