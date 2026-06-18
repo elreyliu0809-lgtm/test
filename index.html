@@ -223,9 +223,9 @@ const GENERALS = {
     { key:'huangzhong', name:'黄忠',  category:'defense', glyph:'◈黄', desc:'极远狙击',  dpsMul:4.0, rangeMul:2.2, spdMul:0.6, projSize:5 },
     { key:'zhugeliang', name:'诸葛亮',category:'defense', glyph:'◈诸', desc:'减速中毒',  dpsMul:3.5, rangeMul:1.5, spdMul:1.0, projSize:6, slow:0.5 },
     { key:'zhouyu',     name:'周瑜',  category:'defense', glyph:'◈周', desc:'连锁火焰',  dpsMul:5.5, rangeMul:1.2, spdMul:0.9, projSize:5, chain:4, chainDecay:0.75 },
-    { key:'simayi',     name:'司马懿',category:'defense', glyph:'◈司', desc:'天命雷暴',  dpsMul:4.0, rangeMul:1.0, spdMul:1.0, projSize:5, storm:true },
+    { key:'simayi',     name:'司马懿',category:'defense', glyph:'◈司', desc:'天命雷暴',  dpsMul:2.5, rangeMul:1.0, spdMul:1.0, projSize:5, storm:true },
     { key:'taishici',   name:'太史慈',category:'defense', glyph:'◈太', desc:'穿透急射',  dpsMul:3.0, rangeMul:1.5, spdMul:1.8, projSize:4 },
-    { key:'pangtong',   name:'庞统',  category:'defense', glyph:'◈庞', desc:'连环雷击',  dpsMul:3.0, rangeMul:1.0, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
+    { key:'pangtong',   name:'庞统',  category:'defense', glyph:'◈庞', desc:'连环雷击',  dpsMul:2.0, rangeMul:1.0, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
     { key:'xuchu',      name:'许褚',  category:'defense', glyph:'◈许', desc:'击晕控制',  dpsMul:2.5, rangeMul:1.2, spdMul:0.8, projSize:5, stun:0.3, disabled:true },
   ],
 };
@@ -1140,8 +1140,8 @@ function spawnWave(){
 
   const hpBase = waveCount <= 3
     ? Math.round((15 + waveCount * 8) * 0.9)
-    : Math.round(40 * Math.pow(1.35, waveCount - 3) * 0.9);
-  const baseCount = 1 + Math.floor(waveCount * 0.6);
+    : Math.round(40 * Math.pow(1.35, Math.min(waveCount, 8) - 3) * 0.9);
+  const baseCount = 1 + Math.floor(Math.min(waveCount, 8) * 0.6);
 
   // 最后几波（≥13）：分三级人海冲锋，逐波递增
   if(waveCount >= 13){
@@ -2156,7 +2156,7 @@ function tick(dt){
         t.rallying = true;
         const _rLane = t.laneIdx!=null ? t.laneIdx : 1;
         t.rallyX = LANES[_rLane];
-        t.rallyY = cy - HEX_ROW * 3;
+        t.rallyY = cy - HEX_ROW * 1;
       }
       continue;
     }
@@ -2331,7 +2331,7 @@ function tick(dt){
                 pe.hp-=pierceDmg; spawnFloat(pe.x,pe.y-10,Math.round(pierceDmg)+'',0xff6633);
                 trackDmg(t.srcKey,t.srcName,pierceDmg);
                 if(globalBuffs.chargeKnockback_lubu){
-                  pe.x+=chgNX*HEX_SIZE*0.8; pe.y+=chgNY*HEX_SIZE*0.8;
+                  pe.x+=chgNX*HEX_SIZE*0.8; pe.y+=Math.min(chgNY,0)*HEX_SIZE*0.8;
                   if(pe.cont){ pe.cont.x=pe.x; pe.cont.y=pe.y; }
                 }
                 // 穿透命中：点亮所在六边形单元格
@@ -2515,11 +2515,11 @@ function spawnGeneralTroop(cell, initialTarget, dmg){
 }
 
 function spawnRallyTroop(cell, dmg){
-  const _cqRal=Math.round((cell.px - cx) / HEX_COL);
-  const laneIdx = _cqRal < 0 ? 0 : _cqRal > 0 ? 2 : 1;
+  const _cq=Math.round((cell.px - cx) / HEX_COL);
+  const laneIdx = _cq < 0 ? 0 : _cq > 0 ? 2 : 1;
   // 集结点：建筑格对应列，建筑群外沿再向前约一格
   const rallyX = LANES[laneIdx];
-  const rallyY = cy - HEX_ROW * 3;
+  const rallyY = cy - HEX_ROW * 1;
   const bt=B_TYPES.find(b=>b.key===cell.category);
   const gen=cell.general; const isMaxLvl=cell.lvl>=TUNE.maxLvl&&gen;
   const size=isMaxLvl?(gen.projSize||6)+2:5;
