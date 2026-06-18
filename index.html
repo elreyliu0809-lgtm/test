@@ -1,0 +1,2685 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>灰盒 v1.2 · 六边形翻地·自由合成·扇形塔防</title>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js-legacy@7.3.2/dist/pixi-legacy.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { background:#0e1418; color:#e8eef2; font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  overflow:hidden; height:100%; }
+body { display:flex; flex-direction:column; align-items:center; }
+
+#tune { width:100%; background:#0a0f12ee; border-bottom:1px solid #1d2a32; padding:5px 10px;
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11px; color:#8fa6b2; z-index:10; }
+#tune b { color:#cfe; } #tune label { display:flex; align-items:center; gap:3px; }
+#tune input { width:36px; background:#16242c; border:1px solid #283a44; color:#e8eef2; border-radius:3px; padding:2px 3px; font-size:11px; text-align:center; }
+#tune button { background:#1f6feb; color:#fff; border:none; border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
+
+#gameArea { flex:1; width:100%; max-width:480px; position:relative; }
+#stage { width:100%; height:100%; display:block; }
+
+#hud { position:absolute; top:0; left:0; right:0; padding:8px 12px; display:flex; justify-content:flex-end; align-items:flex-start; pointer-events:none; z-index:5; }
+.hud-card { background:#0a0f12dd; border:1px solid #1f2c34; border-radius:8px; padding:6px 10px; pointer-events:auto; }
+.hud-val { font-size:20px; font-weight:800; line-height:1; }
+.hud-val.gold { color:#ffd24a; } .hud-val.red { color:#ff5a5a; } .hud-val.blue { color:#4a9eff; }
+.hud-lbl { font-size:10px; color:#6f8593; }
+.hud-bar { height:6px; border-radius:3px; background:#1c2a33; margin-top:3px; min-width:60px; }
+.hud-bar-fill { height:100%; border-radius:3px; transition:width .3s; }
+
+#mergeHint { position:absolute; top:60px; left:50%; transform:translateX(-50%); background:#ffd24a;
+  color:#0e1418; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:700;
+  pointer-events:auto; cursor:pointer; display:none; z-index:5; box-shadow:0 4px 12px #0004; }
+
+#gameOverlay { position:absolute; inset:0; background:#0008; display:none; justify-content:center; align-items:center; z-index:20; }
+#gameOverlay .go-text { color:#ff3333; font-size:36px; font-weight:800; text-shadow:0 3px 12px #000; }
+#gameOverlay button { margin-top:16px; background:#1f6feb; color:#fff; border:none; border-radius:8px; padding:10px 24px; font-size:16px; cursor:pointer; }
+
+/* 选择面板 */
+#pickOverlay { position:absolute; inset:0; background:#000a; display:none; justify-content:center; align-items:center; z-index:25; flex-direction:column; }
+#pickTitle { color:#ffd24a; font-size:18px; font-weight:800; margin-bottom:12px; text-shadow:0 2px 8px #000; }
+#pickOptions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; padding:0 16px; }
+.pick-card { background:#16242c; border:2px solid #2c3f4b; border-radius:12px; padding:12px 14px; min-width:120px;
+  cursor:pointer; text-align:center; transition:all .15s; }
+.pick-card:hover { border-color:#ffd24a; transform:scale(1.06); }
+.pick-icon { font-size:24px; margin-bottom:4px; }
+.pick-name { font-size:15px; font-weight:700; color:#e8eef2; }
+.pick-desc { font-size:11px; color:#8fa6b2; margin-top:3px; }
+
+/* 战前选将 */
+#draftOverlay { position:absolute; inset:0; background:#0e1418f0; display:none; flex-direction:column;
+  justify-content:center; align-items:center; z-index:30; padding:16px; overflow-y:auto; }
+#draftTitle { color:#ffd24a; font-size:22px; font-weight:800; margin-bottom:4px; }
+#draftDesc { color:#8fa6b2; font-size:12px; margin-bottom:16px; }
+#draftGrid { display:flex; flex-direction:column; gap:12px; width:100%; max-width:420px; }
+.draft-row { display:flex; flex-direction:column; gap:6px; }
+.draft-row-title { font-size:12px; color:#6f8593; font-weight:700; padding-left:4px; }
+.draft-row-cards { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
+.draft-card { background:#16242c; border:2px solid #2c3f4b; border-radius:10px; padding:6px 8px;
+  min-width:56px; max-width:80px; cursor:pointer; text-align:center; transition:all .15s; position:relative; }
+.draft-card:hover { border-color:#4a9eff; transform:scale(1.04); }
+.draft-card.selected { border-color:#ffd24a; background:#1f2e1a; box-shadow:0 0 12px #ffd24a44; }
+.draft-card .pick-icon { font-size:18px; }
+.draft-card .pick-name { font-size:13px; }
+.draft-card .pick-desc { font-size:10px; }
+.recommend-badge { position:absolute; top:-1px; right:-1px; background:#ffd24a; color:#000; font-size:7px; font-weight:800; padding:1px 4px; border-radius:0 10px 0 6px; line-height:1.8; pointer-events:none; }
+#draftStart { margin-top:16px; background:#1f6feb; color:#fff; border:none; border-radius:8px;
+  padding:12px 32px; font-size:16px; font-weight:700; cursor:pointer; transition:all .15s; }
+#draftStart:hover { background:#3a8aff; transform:scale(1.05); }
+#draftStart:disabled { background:#333; color:#666; cursor:not-allowed; transform:none; }
+
+#winOverlay { position:absolute; inset:0; background:#0008; display:none; justify-content:center; align-items:center; z-index:20; }
+#winOverlay .win-text { color:#ffd24a; font-size:32px; font-weight:800; text-shadow:0 3px 12px #000; }
+#winOverlay .win-sub { color:#8fa6b2; font-size:14px; margin:8px 0 16px; }
+.win-stats { background:#0a1418; border:1px solid #1f3040; border-radius:10px; padding:10px 14px; margin:0 0 14px; text-align:left; min-width:220px; }
+.ws-title { color:#ffd24a; font-size:12px; font-weight:800; margin-bottom:8px; text-align:center; }
+.ws-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid #1a2830; }
+.ws-row:last-child { border-bottom:none; }
+.ws-name { color:#e0e8ec; font-size:12px; font-weight:700; margin-right:8px; }
+.ws-nums { color:#8fa6b2; font-size:11px; white-space:nowrap; }
+.ws-pct { color:#4affff; font-weight:700; }
+#guideHint { position:absolute; top:52px; left:50%; transform:translateX(-50%); background:#4affff18; border:1px solid #4affff66; color:#4affff; padding:6px 16px; border-radius:20px; font-size:12px; font-weight:700; pointer-events:none; display:none; z-index:5; white-space:nowrap; }
+
+#hpHud { width:100%; max-width:480px; background:#0a0f12f0; border-top:2px solid #1f2c34; padding:7px 14px 10px; display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+.bhud-row { display:flex; align-items:center; gap:8px; }
+#hpHud .hp-lbl { font-size:11px; color:#8fa6b2; white-space:nowrap; }
+#hpHud .hp-val { font-size:18px; font-weight:800; color:#ff5a5a; white-space:nowrap; line-height:1; min-width:40px; }
+#hpHud .hp-track { flex:1; height:12px; border-radius:6px; background:#1c2a33; overflow:hidden; }
+#hpHud .hp-fill { height:100%; border-radius:6px; background:linear-gradient(90deg,#cc2222,#ff5a5a); transition:width .3s; }
+#hpHud .hp-max { font-size:11px; color:#6f8593; white-space:nowrap; }
+/* 底部进度行 */
+.bp-sep { width:1px; height:20px; background:#1f2c34; flex-shrink:0; }
+.bp-lvl-lbl { font-size:10px; color:#6f8593; white-space:nowrap; }
+.bp-lvl-val { font-size:15px; font-weight:800; color:#ffd24a; line-height:1; }
+.bp-bar { width:52px; height:5px; border-radius:3px; background:#1c2a33; overflow:hidden; flex-shrink:0; }
+.bp-bar-fill { height:100%; border-radius:3px; background:#ffd24a; transition:width .3s; }
+.bp-hint { flex:1; font-size:10px; color:#ffd24a88; white-space:nowrap; }
+.bp-pow-lbl { font-size:10px; color:#6f8593; }
+.bp-pow-val { font-size:12px; font-weight:700; color:#4a9eff; }
+.bp-sum-lbl { font-size:10px; color:#6f8593; }
+.bp-sum-val { font-size:15px; font-weight:800; color:#ffd24a; line-height:1; }
+.bp-sum-sub { font-size:10px; color:#6f8593; }
+/* 强化槽位栏（右侧纵列） */
+#buffBar { position:absolute; right:4px; top:90px; display:flex; flex-direction:column; gap:6px; z-index:6; }
+.buff-chip { background:#0e1e28cc; border:1px solid #2c4454; border-radius:6px; padding:4px 7px; font-size:12px; color:#b8d4e2; white-space:nowrap; display:flex; align-items:center; gap:3px; cursor:pointer; }
+.buff-chip:hover { border-color:#5a9dc5; background:#1a3040cc; }
+.buff-chip .bc-icon { font-size:14px; }
+.buff-chip .bc-count { font-size:11px; color:#8fc8e0; }
+#buffDetail { display:none; position:absolute; right:76px; top:90px; background:#0e1e28ee; border:1px solid #3a6070; border-radius:8px; padding:8px 10px; z-index:7; min-width:130px; }
+#buffDetail .bd-title { font-size:13px; color:#5ac8fa; font-weight:bold; margin-bottom:5px; }
+#buffDetail .bd-item { font-size:11px; color:#b8d4e2; padding:2px 0; border-bottom:1px solid #1e3040; }
+#buffDetail .bd-item:last-of-type { border-bottom:none; }
+#buffDetail .bd-close { font-size:10px; color:#5a8a9a; cursor:pointer; text-align:right; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div id="tune">
+  <b>TUNE v1.2</b>
+  <label>合成阶数<input id="t_maxLvl" type="number" value="4"></label>
+  <label>每次解锁<input id="t_unlock" type="number" value="4"></label>
+  <label>波次ms<input id="t_waveMs" type="number" value="8000" style="width:44px"></label>
+  <label>敌速<input id="t_enemySpd" type="number" value="0.4" style="width:36px"></label>
+  <label>翻CD<input id="t_flipCd" type="number" value="800" style="width:44px"></label>
+  <label>免CD次数<input id="t_freeFlips" type="number" value="0" style="width:30px"></label>
+  <label>金币倍率<input id="t_goldMul" type="number" value="1.0" style="width:36px"></label>
+  <button id="t_apply">重开</button>
+  <span id="t_note" style="color:#5f7480"></span>
+</div>
+
+<div id="gameArea">
+  <canvas id="stage"></canvas>
+  <div id="hud">
+    <div class="hud-card">
+      <div class="hud-lbl">波次</div>
+      <div class="hud-val blue" id="waveCountEl">0/15</div>
+      <div class="hud-lbl">下一波 <span id="waveTimerEl">5s</span></div>
+    </div>
+  </div>
+  <div id="mergeHint">选择合成目标（点同种同级建筑）· 点此取消</div>
+  <div id="pickOverlay"><div id="pickTitle"></div><div id="pickOptions"></div></div>
+  <div id="draftOverlay">
+    <div id="draftTitle">选择武将阵容</div>
+    <div id="draftDesc">进攻2位 + 防守2位，共4将出征</div>
+    <div id="draftGrid"></div>
+    <button id="draftStart">开始战斗</button>
+  </div>
+  <div id="gameOverlay"><div style="text-align:center"><div class="go-text">基地陷落</div><button id="btnRestart2">重开</button></div></div>
+  <div id="winOverlay"><div style="text-align:center"><div class="win-text">🎉 通关！</div><div class="win-sub">撑过 15 波，大获全胜 · 难度 <span id="difficultyEl">1</span></div><div id="winStats" class="win-stats"></div><div style="display:flex;gap:10px;justify-content:center"><button id="btnRestart3" style="background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:16px;cursor:pointer;">再战一局</button><button id="btnNextDiff" style="background:#2ea043;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:16px;cursor:pointer;">下一难度</button></div></div></div>
+  <div id="guideHint"></div>
+  <!-- 强化槽位（右侧纵列，最多5个：4将+少年） -->
+  <div id="buffBar"></div>
+  <div id="buffDetail"></div>
+</div>
+
+<div id="hpHud">
+  <div class="bhud-row">
+    <div class="hp-lbl">城墙</div>
+    <div class="hp-val" id="hpEl">500</div>
+    <div class="hp-track"><div class="hp-fill" id="hpBar" style="width:100%"></div></div>
+    <div class="hp-max" id="hpMaxEl">/ 500</div>
+  </div>
+  <div class="bhud-row">
+    <div class="bp-lvl-lbl">基地 Lv</div>
+    <div class="bp-lvl-val" id="baseLvlEl">1</div>
+    <div class="bp-bar"><div class="bp-bar-fill" id="lvlBar" style="width:0%"></div></div>
+    <div class="bp-hint" id="lvlHintEl">还需4次升级</div>
+    <div class="bp-sep"></div>
+    <div class="bp-pow-lbl">金币</div>
+    <div class="bp-pow-val" id="goldHudEl">0</div>
+    <div class="bp-sep"></div>
+    <div class="bp-sum-lbl">召唤</div>
+    <div class="bp-sum-val" id="summonEl">0</div>
+    <div class="bp-sum-sub">次 · 下次<span id="summonCostEl">¥10</span> · 余<span id="flipsEl">0</span>格</div>
+  </div>
+  <!-- 强化槽位已移至 gameArea 右侧纵列 -->
+</div>
+
+<script>
+/* ============================================================
+   灰盒 v1.2 — 基地在底部·只能向上扩·格子耗尽升级·指数数值压力·武将炸裂特效
+   ============================================================ */
+
+// ===== TUNE =====
+const TUNE = {
+  maxRings: 3,
+  maxLvl: 4,
+  waveMs: 8000,
+  enemySpd: 0.4,
+  baseHP: 500,
+  unlockCount: 4,
+  flipCdMs: 800,   // 仅防误触（P4：金币取代CD作为节流机制）
+  initFreeFlips: 0, // 已废弃，初始100G本身覆盖前3次翻格
+  goldMul: 1.0,  // 金币掉落全局倍率（playtest 调参用）
+};
+
+// 每击杀金币掉落：Math.round(waveCount * GOLD_PER_KILL[waveType] * TUNE.goldMul)
+const GOLD_PER_KILL = { normal:6, swarm:3, elite:50, speed:5 };
+
+// 翻牌累计达到这些次数时基地升级并解锁地格（单局约5次，对标蔚蓝的低频升级）
+// 升级与"铺满地块"解耦——合成只为战力服务，不再左右升级节奏
+// 首阈值=开局可翻格数(4)，保证首次升级无需合成即可达成，避免开局4格全异将时锁死
+const UPGRADE_FLIPS = [4, 9, 15, 22, 30];
+
+// 召唤(翻格)价格阶梯——对标蔚蓝。本步只用于HUD展示与节奏参考(单局约33次≈战斗结束)，
+// 暂不扣金币/不加收入/不锁死；真实金币经济(怪物波次掉落)留待下一步设计。
+const FLIP_PRICES = [10,20,30,45,60,80,90,110,130,150,160,175,190,200,215,235,260,290,320,350,380,420,455,485,515,545,575,605,620,630,640,650,660,660];
+const START_GOLD = 100;
+
+// ===== 建筑（进攻=出兵，防守=站桩远程） =====
+const B_TYPES = [
+  { key:'advance', name:'进攻', hex:0xff5a5a, css:'#ff5a5a', glyph:'⚔', range:2.0, dps:6, troopSpd:0.33 },
+  { key:'defense', name:'防守', hex:0x4a9eff, css:'#4a9eff', glyph:'◈', range:2.0, dps:4 },
+];
+
+// ===== 武将池（进攻：产亲兵出征；防守：站桩远程输出） =====
+const GENERALS = {
+  advance: [
+    { key:'guanyu',   name:'关羽',  category:'advance', glyph:'⚔关', desc:'统帅千军',  dpsMul:5.0, rangeMul:1.2, spdMul:1.0, projSize:6 },
+    { key:'zhangfei', name:'张飞',  category:'advance', glyph:'⚔张', desc:'亲兵爆裂',  dpsMul:3.5, rangeMul:0.9, spdMul:0.8, projSize:8, aoe:true },
+    { key:'zhaoyun',  name:'赵云',  category:'advance', glyph:'⚔赵', desc:'龙骑突击',  dpsMul:3.5, rangeMul:1.0, spdMul:2.0, projSize:4 },
+    { key:'ganning',  name:'甘宁',  category:'advance', glyph:'⚔甘', desc:'三路突袭',  dpsMul:2.0, rangeMul:1.3, spdMul:1.0, projSize:3, multishot:3, disabled:true },
+    { key:'caoren',   name:'曹仁',  category:'advance', glyph:'⚔曹', desc:'嘲讽反伤',  dpsMul:1.5, rangeMul:2.0, spdMul:1.0, projSize:4, taunt:true, reflect:0.3 },
+    { key:'dianwei',  name:'典韦',  category:'advance', glyph:'⚔典', desc:'灼烧光环',  dpsMul:3.0, rangeMul:1.0, spdMul:1.2, projSize:5, burnAura:true },
+    { key:'lubu',     name:'吕布',  category:'advance', glyph:'⚔布', desc:'铁骑冲阵',  dpsMul:4.0, rangeMul:1.5, spdMul:2.2, projSize:7, charge:true },
+  ],
+  defense: [
+    { key:'huangzhong', name:'黄忠',  category:'defense', glyph:'◈黄', desc:'极远狙击',  dpsMul:4.0, rangeMul:2.2, spdMul:0.6, projSize:5 },
+    { key:'zhugeliang', name:'诸葛亮',category:'defense', glyph:'◈诸', desc:'减速中毒',  dpsMul:3.5, rangeMul:1.5, spdMul:1.0, projSize:6, slow:0.5 },
+    { key:'zhouyu',     name:'周瑜',  category:'defense', glyph:'◈周', desc:'连锁火焰',  dpsMul:5.5, rangeMul:1.2, spdMul:0.9, projSize:5, chain:4, chainDecay:0.75 },
+    { key:'simayi',     name:'司马懿',category:'defense', glyph:'◈司', desc:'天命雷暴',  dpsMul:4.0, rangeMul:1.0, spdMul:1.0, projSize:5, storm:true },
+    { key:'taishici',   name:'太史慈',category:'defense', glyph:'◈太', desc:'穿透急射',  dpsMul:3.0, rangeMul:1.5, spdMul:1.8, projSize:4 },
+    { key:'pangtong',   name:'庞统',  category:'defense', glyph:'◈庞', desc:'连环雷击',  dpsMul:3.0, rangeMul:1.0, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
+    { key:'xuchu',      name:'许褚',  category:'defense', glyph:'◈许', desc:'击晕控制',  dpsMul:2.5, rangeMul:1.2, spdMul:0.8, projSize:5, stun:0.3, disabled:true },
+  ],
+};
+
+// ===== 通用词条（保底） =====
+const BUFF_POOL_COMMON = [
+  { key:'heal',  name:'城墙修复', desc:'城墙回血30',    icon:'♥', apply: g=>{ baseHP=Math.min(maxHP, baseHP+30); }},
+  { key:'maxHp', name:'坚城厚壁', desc:'HP上限+40',     icon:'🛡', apply: g=>{ maxHP+=40; baseHP+=40; }},
+];
+
+// ===== 少年（主基地英雄）强化词条 =====
+let shaoNianAtk = null; // 在startGame初始化：{ timer, targets, dmgMul, rangeMul, spdMul }
+const SHAONIAN_UPGRADES = [
+  { key:'sn_targets', name:'少年·纵横', desc:'主基地攻击同时打+1目标（最多3个）', icon:'⚔',
+    apply: ()=>{ if(shaoNianAtk) shaoNianAtk.targets = Math.min(3, shaoNianAtk.targets+1); }},
+  { key:'sn_dmg',    name:'少年·锋芒', desc:'主基地攻击伤害×1.5', icon:'💥',
+    apply: ()=>{ if(shaoNianAtk) shaoNianAtk.dmgMul *= 1.5; }},
+  { key:'sn_range',  name:'少年·远望', desc:'主基地攻击范围+40%', icon:'👁',
+    apply: ()=>{ if(shaoNianAtk) shaoNianAtk.rangeMul *= 1.4; }},
+  { key:'sn_speed',  name:'少年·急袭', desc:'主基地攻击间隔缩短40%', icon:'⚡',
+    apply: ()=>{ if(shaoNianAtk) shaoNianAtk.spdMul *= 0.6; }},
+  { key:'sn_wallregen', name:'少年·城墙修复', desc:'每5秒回复10点城墙生命', icon:'🏯',
+    apply: ()=>{ globalBuffs.wallRegen_shaonian = true; }},
+];
+
+// ===== 武将专属词条 =====
+// apply(g) 写全局buff；applyCell(cell,g) 写格子级属性（升级时遍历所有同将格）
+const GENERAL_UPGRADES = {
+  // ── 进攻将 ──
+  guanyu: [
+    { key:'guanyu_a', name:'关羽·义绝', desc:'青龙斩穿透延长至5格（+2格）', icon:'⚔',
+      apply: g=>{ g.troopSplash_guanyu=true; }},
+    { key:'guanyu_b', name:'关羽·武圣', desc:'每次产兵时激励全军，8秒内每批次产兵全体亲兵伤害+8%（最多3层+24%）', icon:'👑',
+      apply: g=>{ g.presenceBuff_guanyu=true; }},
+  ],
+  zhangfei: [
+    { key:'zhangfei_a', name:'张飞·霸王怒', desc:'AOE扩展为两圈范围', icon:'💢',
+      apply: g=>{ g.aoeRadiusMul_zhangfei=2; }},
+    { key:'zhangfei_b', name:'张飞·火爆', desc:'AOE命中的敌人获得灼烧标记，2秒内每0.5秒受AOE伤害30%的持续伤害', icon:'🔥',
+      apply: g=>{ g.aoeBurn_zhangfei=true; }},
+  ],
+  zhaoyun: [
+    { key:'zhaoyun_a', name:'赵云·龙胆', desc:'每3击附加×2伤害', icon:'🌀',
+      apply: g=>{ g.tripleStrike_zhaoyun=true; }},
+    { key:'zhaoyun_b', name:'赵云·七进七出', desc:'亲兵攻速×1.5', icon:'⚡',
+      apply: g=>{ g.troopAtkSpd_zhaoyun=1.5; }},
+  ],
+  ganning: [
+    { key:'ganning_a', name:'甘宁·百船', desc:'多射+1路共4路', icon:'🏹',
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='ganning') cell.general=Object.assign({},cell.general,{multishot:4}); }},
+    { key:'ganning_b', name:'甘宁·奇袭', desc:'甘宁亲兵击杀时，对最近另一敌人造成50%伤害', icon:'🎯',
+      apply: g=>{ g.ganningChain=true; }},
+  ],
+  taishici: [
+    { key:'taishici_a', name:'太史慈·穿云贯日', desc:'弹道穿透3次，每次+10%伤害', icon:'➶',
+      apply: g=>{ g.pierce_taishici=3; }},
+    { key:'taishici_b', name:'太史慈·鸣镝', desc:'每4发蓄力，第5发伤害×2弹速×3', icon:'🎯',
+      apply: g=>{ g.mingdi_taishici=true; }},
+  ],
+  // ── 防守将 ──
+  huangzhong: [
+    { key:'huangzhong_a', name:'黄忠·落雕散射', desc:'发射3条弹道，每条×0.55伤害', icon:'🏹',
+      apply: g=>{ g.scatter_huangzhong=3; }},
+    { key:'huangzhong_b', name:'黄忠·百步穿心', desc:'暴击率+25%，暴击×5', icon:'💥',
+      apply: g=>{ g.critChance_huangzhong=(g.critChance_huangzhong||0)+0.25; g.critMul_huangzhong=5; }},
+  ],
+  zhugeliang: [
+    { key:'zhugeliang_a', name:'诸葛亮·八阵延伸', desc:'减速变AOE，范围内全体慢', icon:'❄',
+      apply: g=>{ g.slowAoe_zhugeliang=true; }},
+    { key:'zhugeliang_b', name:'诸葛亮·木牛', desc:'减速效果提升到80%', icon:'🐂',
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhugeliang') cell.general=Object.assign({},cell.general,{slow:0.2}); }},
+  ],
+  zhouyu: [
+    { key:'zhouyu_a', name:'周瑜·连环+1', desc:'连锁次数+1共5次', icon:'🔗',
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhouyu') cell.general=Object.assign({},cell.general,{chain:5}); }},
+    { key:'zhouyu_b', name:'周瑜·子弹道', desc:'命中时分裂出2条50%伤害飞弹', icon:'✦',
+      apply: g=>{ g.splitProj_zhouyu=true; }},
+  ],
+  simayi: [
+    { key:'simayi_a', name:'司马懿·天命扩域', desc:'雷暴从一格扩展为目标周围七格AOE', icon:'⚡',
+      apply: g=>{ g.stormExpand_simayi=true; }},
+    { key:'simayi_b', name:'司马懿·落雷', desc:'每次雷暴有15%概率触发落雷，对单体造成×5伤害', icon:'⚡',
+      apply: g=>{ g.stormBolt_simayi=true; }},
+  ],
+  caoren: [
+    { key:'caoren_a', name:'曹仁·铁壁', desc:'嘲讽光环扩展为2圈范围', icon:'🛡',
+      apply: g=>{ g.tauntRangeMul_caoren=2; }},
+    { key:'caoren_b', name:'曹仁·镇慑', desc:'被嘲讽敌人攻速-40%（攻击间隔×1.67）', icon:'🛡',
+      apply: g=>{ g.tauntAtkSlow_caoren=true; }},
+  ],
+  xuchu: [
+    { key:'xuchu_a', name:'许褚·虎痴', desc:'击晕概率×2共60%', icon:'😵',
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='xuchu') cell.general=Object.assign({},cell.general,{stun:0.6}); }},
+    { key:'xuchu_b', name:'许褚·军法', desc:'击晕时扩散：周围敌人30%概率连带被晕1秒', icon:'⛓',
+      apply: g=>{ g.stunSpread_xuchu=true; }},
+  ],
+  dianwei: [
+    { key:'dianwei_a', name:'典韦·烈焰', desc:'灼烧半径+60%，DPS×1.5，灼杀也落地火区', icon:'🔥',
+      apply: g=>{ g.burnRadiusMul_dianwei=1.6; g.burnDpsMul_dianwei=1.5; g.fireZone_dianwei=true; }},
+    { key:'dianwei_b', name:'典韦·殉燃', desc:'亲兵阵亡时火海持续时间+5秒，并减慢范围内敌人移速60%', icon:'🌋',
+      apply: g=>{ g.deathFireBoost_dianwei=true; }},
+  ],
+  lubu: [
+    { key:'lubu_a', name:'吕布·赤兔', desc:'冲阵穿透宽度×1.5，穿透伤害×1.5', icon:'🐴',
+      apply: g=>{ g.chargeWidthMul_lubu=1.5; g.chargeDmgMul_lubu=1.5; }},
+    { key:'lubu_b', name:'吕布·方天画戟', desc:'主目标伤害×1.5，冲阵穿透敌人被击退1格', icon:'⚔',
+      apply: g=>{ g.chargeKnockback_lubu=true; }},
+  ],
+  pangtong: [
+    { key:'pangtong_a', name:'庞统·落凤', desc:'连锁命中处触发1格范围爆炸，爆炸造成50%伤害', icon:'💥',
+      apply: g=>{ g.boltExplode_pangtong=true; }},
+    { key:'pangtong_b', name:'庞统·连璧', desc:'连锁次数+4（共8次弹射）', icon:'⚡',
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='pangtong') cell.general=Object.assign({},cell.general,{chain:8}); }},
+  ],
+};
+
+// ===== 六边形工具（flat-top 平顶，上下边水平，紧密排列） =====
+const HEX_SIZE = 32;
+const HEX_COL = 1.5 * HEX_SIZE;          // 平顶：列间距（水平）
+const HEX_ROW = Math.sqrt(3) * HEX_SIZE; // 平顶：行间距（垂直）
+const RANGED_RANGE_CAP = HEX_ROW * 8;    // 远程有效射程上限（约8格），防一杆覆盖全场（B案，可调）
+
+function hexToPixel(q, r, cx, cy) {
+  return { x: HEX_COL * q + cx, y: HEX_ROW * (r + q*0.5) + cy };
+}
+
+// 像素坐标 → 所在六边形单元格中心（flat-top 立方取整）。cx/cy 为运行时全局基地中心。
+const HEX_DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]]; // flat-top 六邻居（axial）
+function pixelToAxial(px, py) {
+  const q = (px - cx) / HEX_COL;
+  const r = (py - cy) / HEX_ROW - q * 0.5;
+  let s = -q - r;
+  let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+  const dq = Math.abs(rq - q), dr = Math.abs(rr - r), ds = Math.abs(rs - s);
+  if (dq > dr && dq > ds) rq = -rr - rs;
+  else if (dr > ds) rr = -rq - rs;
+  return { q: rq, r: rr };
+}
+function pixelToHexCenter(px, py) {
+  const a = pixelToAxial(px, py);
+  return hexToPixel(a.q, a.r, cx, cy);
+}
+// 两个像素点是否落在同一六边形单元格内
+function sameHexCell(ax, ay, bx, by) {
+  const a = pixelToAxial(ax, ay), b = pixelToAxial(bx, by);
+  return a.q === b.q && a.r === b.r;
+}
+// 该格是否可走：汇聚线以上仅三路列(q=-3/0/3)，汇聚线以下全可走
+function laneWalkable(q, r) {
+  const p = hexToPixel(q, r, cx, cy);
+  if (p.y >= LANE_MERGE_Y) return true;
+  return q === -3 || q === 0 || q === 3;
+}
+// 朝 (gx,gy) 前进的下一格中心：贪心选最朝目标方向的可走邻居；接近目标则直接给目标
+function nextStepCenter(px, py, gx, gy) {
+  const goalDx = gx - px, goalDy = gy - py;
+  const gl = Math.hypot(goalDx, goalDy);
+  if (gl <= HEX_SIZE * 1.1) return { x: gx, y: gy };
+  const cur = pixelToAxial(px, py);
+  let best = null, bestScore = -Infinity;
+  for (const [dq, dr] of HEX_DIRS) {
+    const np = hexToPixel(cur.q + dq, cur.r + dr, cx, cy);
+    if (!laneWalkable(cur.q + dq, cur.r + dr)) continue;
+    const ndx = np.x - px, ndy = np.y - py, nl = Math.hypot(ndx, ndy) || 1;
+    const score = (ndx * goalDx + ndy * goalDy) / (nl * gl);
+    if (score > bestScore) { bestScore = score; best = np; }
+  }
+  return best || { x: gx, y: gy };
+}
+// 两像素点之间的六边形格距离（轴向立方距离）
+function hexDistance(ax, ay, bx, by) {
+  const a = pixelToAxial(ax, ay), b = pixelToAxial(bx, by);
+  return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+}
+
+// 返回平顶六边形的顶点数组（供 drawPolygon 使用）
+function hexPoly(hx, hy, r) {
+  const pts = [];
+  for(let i=0;i<6;i++){ const a=Math.PI/3*i; pts.push(hx+r*Math.cos(a), hy+r*Math.sin(a)); }
+  return pts;
+}
+
+// 铺满全屏的背景六边形地板（纯视觉，覆盖范围含左右滚动余量）
+function buildBgHexGrid() {
+  bgHexC.removeChildren();
+  const g = new PIXI.Graphics();
+  const qMin = Math.floor(-cx / HEX_COL) - 1;
+  const qMax = Math.ceil((W - cx) / HEX_COL) + 1;
+  const rMin = Math.floor((-cy - HEX_SIZE) / HEX_ROW) - 1;
+  const rMax = Math.ceil((H - cy + HEX_SIZE) / HEX_ROW) + 1;
+  for(let q=qMin; q<=qMax; q++) {
+    for(let r=rMin; r<=rMax; r++) {
+      const px = cx + q * HEX_COL;
+      const py = cy + HEX_ROW * (r + q * 0.5);
+      g.lineStyle(1, 0x1e3848, 0.7);
+      g.beginFill(0x0c1a24, 0.95);
+      g.drawPolygon(hexPoly(px, py, HEX_SIZE - 1));
+      g.endFill();
+    }
+  }
+  bgHexC.addChild(g);
+}
+
+function hexRing(radius) {
+  if (radius === 0) return [{ q:0, r:0 }];
+  const results = [];
+  for (let dq = -radius; dq <= radius; dq++) {
+    for (let dr = Math.max(-radius, -dq-radius); dr <= Math.min(radius, -dq+radius); dr++) {
+      const ds = -dq - dr;
+      if (Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds)) === radius)
+        results.push({ q:dq, r:dr });
+    }
+  }
+  return results;
+}
+
+function hexCorners(size) {
+  const c = [];
+  for (let i=0; i<6; i++) {
+    const angle = Math.PI/180 * (60*i);
+    c.push(size*Math.cos(angle), size*Math.sin(angle));
+  }
+  return c;
+}
+
+// ===== 全局状态 =====
+let app, worldC, enemyC, projC, floatC, bgHexC;
+let W, H, cx, cy;
+let hexCells = [];
+let enemies = [];
+let projectiles = [];
+let floats = [];
+let baseHP, maxHP;
+let gold = 0;
+let goldTrickleTimer = 0;
+let goldSpent = 0;  // 累计翻格消耗
+let goldEarned = 0; // 累计金币收入（含初始+击杀+涓流）
+let baseLvl = 1;
+let totalFlips = 0;
+let waveTimer = 0;
+let waveCount = 0;
+let eliteLaneCycle = 0; // 精英路循环计数器（0=左 1=中 2=右，逐波推进）
+let gameOver = false;
+let shake = 0;
+let flipCooldown = 0; // 翻格冷却计时器(ms)
+let wallGfx = null; // 城墙图形对象
+// ===== 横向滚动 =====
+let wallFlash = 0; // 城墙受击闪红计时
+let gameWon = false;
+let difficulty = 1; // 难度等级：每下一难度敌人HP/ATK+3%
+let guideStep = 3; // 0=翻牌提示 1=合并提示 2+=完成；3=跳过（非首局）
+let isFirstGame = true;
+let inDraft = false; // 选将阶段暂停出怪
+let damageStats = {}; // { genKey: { totalDmg, name } }
+let battleStartTime = 0;
+
+let selectedCell = null;
+let mergeMode = false;
+let globalBuffs = {};
+let pendingPick = null; // { type:'general'|'buff', cell?, options:[], resolve? }
+let draftPicks = []; // 选中的武将扁平数组，最多4个
+let troops = [];
+let appliedBuffs = []; // 已选中的强化buff列表（用于HUD显示）
+let buffDetailGen = null; // 当前展开详情的武将名
+let buffRerollUsed = 0; // 每局广告刷新剩余次数（最多3次）
+let takeAllUsed = false; // 每局「我全都要」限用一次
+let boss = null, bossAoe = null, bossChest = null;
+let fireZones = []; // 典韦·燃地陷阱列表
+let stormZones = []; // 司马懿·天命雷暴持续区域
+let wallRegenTimer = 0; // 少年·城墙修复计时器
+let TROOP_Y_FLOOR = 0; // 士兵活动Y轴下限（城外交战线）
+// 三路：上方用障碍物分割左/中/右，敌人沿各自路推进，逼近领地后汇聚
+let LANES = [], LANE_MERGE_Y = 0, LANE_BOUNDS = [];
+
+// ===== 音效 =====
+let audioCtx = null;
+function ensureAudio(){ if(!audioCtx) try{ audioCtx=new(window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+function blip(freq,dur=0.08,type='triangle',vol=0.14){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=type;o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur);
+}
+function burstSound(n){ for(let i=0;i<Math.min(n,5);i++) setTimeout(()=>blip(380+i*70,0.1,'sawtooth',0.12),i*40); }
+
+// ===== 启动 =====
+function readTune(){
+  const g=id=>parseFloat(document.getElementById(id).value)||0;
+  TUNE.maxLvl=Math.max(2,Math.min(5,g('t_maxLvl')));
+  TUNE.unlockCount=Math.max(1,Math.min(6,g('t_unlock')));
+  TUNE.waveMs=Math.max(1000,g('t_waveMs'));
+  TUNE.enemySpd=Math.max(0.2,g('t_enemySpd'));
+  TUNE.flipCdMs=Math.max(0,g('t_flipCd'));
+  TUNE.initFreeFlips=Math.max(0,g('t_freeFlips'));
+  TUNE.goldMul=Math.max(0.1,g('t_goldMul')||1.0);
+}
+
+function boot(){
+  const canvas = document.getElementById('stage');
+  const area = document.getElementById('gameArea');
+  W = Math.min(480, window.innerWidth);
+  H = area.clientHeight || (window.innerHeight - 36);
+  canvas.width = W; canvas.height = H;
+
+  app = new PIXI.Application({ view:canvas, width:W, height:H,
+    backgroundColor:0x11181d, antialias:true, resolution:window.devicePixelRatio||1, autoDensity:true, forceCanvas:true });
+
+  worldC=new PIXI.Container(); enemyC=new PIXI.Container(); projC=new PIXI.Container(); floatC=new PIXI.Container();
+  bgHexC = new PIXI.Container();
+  app.stage.addChild(bgHexC); // 最底层：背景六边形地板
+  app.stage.addChild(worldC); app.stage.addChild(enemyC); app.stage.addChild(projC); app.stage.addChild(floatC);
+  app.ticker.add(tick);
+
+  cx = W/2;
+  // 平顶布局：基地偏下居中，领地向上(敌方向)铺展，后排格留在基地下方
+  cy = H - HEX_SIZE * 2.5 - 16;
+
+  // 三路几何：路中心 = 左/中/右，分割带在路与路之间，汇聚线在领地前端之上
+  const laneSpread = HEX_COL * 3; // 左/右路中心在q=±3
+  LANES = [cx - laneSpread, cx, cx + laneSpread];
+  LANE_BOUNDS = [cx - HEX_COL*2, cx + HEX_COL*2]; // 障碍列q=±2，与drawLanes保持一致
+  LANE_MERGE_Y = cy - (HEX_ROW * 2 + HEX_SIZE); // 此线以上分三路，以下汇聚向基地
+  TROOP_Y_FLOOR = LANE_MERGE_Y + HEX_SIZE; // 士兵不进入此线以下（城内建筑区）
+
+  buildBgHexGrid(); // 铺全屏背景六边形
+
+  // 横向拖动事件已移除
+
+  readTune(); startGame();
+
+  document.getElementById('t_apply').onclick=()=>{ readTune(); difficulty=1; startGame(); };
+  document.getElementById('btnRestart2').onclick=()=>{ readTune(); startGame(); };
+  document.getElementById('btnRestart3').onclick=()=>{ readTune(); startGame(); };
+  document.getElementById('btnNextDiff').onclick=()=>{ difficulty++; readTune(); startGame(); };
+  document.getElementById('mergeHint').onclick=()=>cancelMerge();
+}
+
+function startGame(){
+  worldC.removeChildren(); enemyC.removeChildren(); projC.removeChildren(); floatC.removeChildren();
+  hexCells=[]; enemies=[]; projectiles=[]; floats=[];
+  baseHP=TUNE.baseHP; maxHP=TUNE.baseHP;
+  baseLvl=1; totalFlips=0; waveCount=0; eliteLaneCycle=0;
+  waveTimer=0; gameOver=false; gameWon=false; shake=0;
+  flipCooldown=0; wallFlash=0;
+  gold=START_GOLD; goldTrickleTimer=0; goldSpent=0; goldEarned=START_GOLD;
+  damageStats={}; battleStartTime=0;
+  selectedCell=null; mergeMode=false;
+  globalBuffs={}; pendingPick=null; draftPicks=[];
+  troops=[]; attackTimers={}; boss=null; bossAoe=null; bossChest=null; fireZones=[]; stormZones=[]; wallRegenTimer=0;
+  shaoNianAtk={ timer:0, targets:1, dmgMul:1, rangeMul:1, spdMul:1 };
+  appliedBuffs=[];
+  buffDetailGen=null;
+  buffRerollUsed=0; takeAllUsed=false;
+  document.getElementById('mergeHint').style.display='none';
+  document.getElementById('gameOverlay').style.display='none';
+  document.getElementById('pickOverlay').style.display='none';
+  document.getElementById('winOverlay').style.display='none';
+  hideGuideHint();
+  inDraft = true;
+  showDraft();
+}
+
+function showDraft(){
+  const overlay = document.getElementById('draftOverlay');
+  const grid = document.getElementById('draftGrid');
+  const btn = document.getElementById('draftStart');
+  grid.innerHTML = ''; draftPicks = [];
+
+  const catNames = { advance:'进攻将 ⚔ — 产亲兵出征', defense:'防守将 ◈ — 站桩远程输出' };
+  const updateBtn = () => {
+    btn.disabled = draftPicks.length !== 4;
+    btn.textContent = `已选 ${draftPicks.length}/4 ▶ 开始战斗`;
+  };
+
+  for(const [catKey, generals] of Object.entries(GENERALS)){
+    const row = document.createElement('div');
+    row.className = 'draft-row';
+    const title = document.createElement('div');
+    title.className = 'draft-row-title';
+    title.textContent = catNames[catKey] || catKey;
+    row.appendChild(title);
+    const cards = document.createElement('div');
+    cards.className = 'draft-row-cards';
+    generals.filter(gen => !gen.disabled).forEach(gen => {
+      const card = document.createElement('div');
+      card.className = 'draft-card';
+      const RECOMMENDED = new Set(['guanyu','lubu','zhangfei','zhugeliang','simayi','pangtong']);
+      const recBadge = RECOMMENDED.has(gen.key) ? '<div class="recommend-badge">推荐</div>' : '';
+      card.innerHTML = `${recBadge}<div class="pick-icon">${gen.glyph}</div><div class="pick-name">${gen.name}</div><div class="pick-desc">${gen.desc}</div>`;
+      card.onclick = () => {
+        const idx = draftPicks.findIndex(g=>g.key===gen.key);
+        if(idx >= 0){
+          draftPicks.splice(idx, 1);
+          card.classList.remove('selected');
+        } else if(draftPicks.length < 4){
+          draftPicks.push(gen);
+          card.classList.add('selected');
+        }
+        updateBtn();
+      };
+      cards.appendChild(card);
+    });
+    row.appendChild(cards);
+    grid.appendChild(row);
+  }
+
+  updateBtn();
+  btn.onclick = () => { overlay.style.display='none'; beginCombat(); };
+  overlay.style.display = 'flex';
+}
+
+function beginCombat(){
+  inDraft = false; waveTimer = TUNE.waveMs; // 立即触发第一波
+  battleStartTime = performance.now();
+  buildHexGrid();
+  updateHUD();
+  setNote(`已选：${draftPicks.map(g=>g.name).join('·')} | 翻牌${UPGRADE_FLIPS.length}次升级·逐步解锁全地格`);
+  if(isFirstGame){
+    isFirstGame=false;
+    guideStep=0;
+    showGuideHint('☝ 点击 ? 格翻牌，建造武将');
+  }
+}
+
+// ===== 建造六边形网格（平顶·显式16格：base + 6初始圈 + 9升级解锁） =====
+const RING1_CELLS = [[0,-1],[1,-1],[1,0],[0,1],[-1,1],[-1,0]];
+const RING2_CELLS = [[2,0],[-2,2],[2,-1],[-2,1],[2,-2],[-2,0],[1,-2],[-1,-1],[0,-2]];
+function hexDist(q,r){ return Math.max(Math.abs(q), Math.abs(r), Math.abs(q+r)); }
+
+function buildHexGrid(){
+  drawLanes();
+  const pushCell = (q,r,state)=> hexCells.push({ q, r, ring:hexDist(q,r), state, building:null, category:null, lvl:0, general:null, generalOut:false, generalRespawnTimer:0, timerArc:null, timerText:null, guidePulse:null, cdArc:null, stormGfx:null, _stormTimer:0 });
+  pushCell(0, 0, 'base');
+  for(const [q,r] of RING1_CELLS) pushCell(q, r, 'flippable'); // 开局可翻一圈
+  for(const [q,r] of RING2_CELLS) pushCell(q, r, 'locked');    // 5次升级按对解锁(后→前)
+
+  for(const cell of hexCells){
+    const {x,y} = hexToPixel(cell.q, cell.r, cx, cy);
+    cell.px = x; cell.py = y;
+    const cont = new PIXI.Container(); cont.x=x; cont.y=y;
+    cont.interactive=true; cont.cursor='pointer';
+    cont.hitArea = new PIXI.Polygon(hexCorners(HEX_SIZE));
+    const bg = new PIXI.Graphics();
+    cont.addChild(bg);
+    cell.cont=cont; cell.bg=bg;
+    drawCell(cell);
+    cont.on('pointerup',()=>{ onCellClick(cell); });
+    worldC.addChild(cont);
+  }
+
+  // 城墙：包裹已揭示/可翻区域的弧线
+  wallGfx = new PIXI.Graphics();
+  drawWall();
+  worldC.addChild(wallGfx);
+}
+
+function drawLanes(){
+  const g = new PIXI.Graphics();
+  // 三路淡色通道
+  const laneHalf = (LANES[1]-LANES[0]) * 0.46;
+  for(const lx of LANES){
+    g.beginFill(0x16242c, 0.5);
+    g.drawRoundedRect(lx-laneHalf, -HEX_SIZE, laneHalf*2, LANE_MERGE_Y+HEX_SIZE, 10);
+    g.endFill();
+  }
+  // 障碍六边形地格（分割左/中/右路，替代竖线）
+  for(const bq of [-2, 2]){
+    const bpx = cx + HEX_COL * bq;
+    const rMin = Math.floor((-cy - HEX_SIZE*2) / HEX_ROW - bq*0.5) - 1;
+    const rMax = Math.ceil((LANE_MERGE_Y - cy) / HEX_ROW - bq*0.5) + 1;
+    for(let r = rMin; r <= rMax; r++){
+      const bpy = HEX_ROW * (r + bq*0.5) + cy;
+      if(bpy < -HEX_SIZE || bpy > LANE_MERGE_Y - HEX_ROW*2) continue;
+      g.beginFill(0x18303d, 0.95);
+      g.lineStyle(1.5, 0x2a5060, 0.8);
+      g.drawPolygon(hexPoly(bpx, bpy, HEX_SIZE - 1));
+      g.endFill(); g.lineStyle(0);
+      g.beginFill(0x3d6878, 0.7); g.drawCircle(bpx, bpy, 5); g.endFill();
+      g.beginFill(0x3d6878, 0.4); g.drawCircle(bpx-9, bpy+7, 3); g.endFill();
+      g.beginFill(0x3d6878, 0.35); g.drawCircle(bpx+8, bpy-6, 2.5); g.endFill();
+    }
+  }
+  // 汇聚提示线
+  g.lineStyle(1.5, 0x4a6a7a, 0.35);
+  g.moveTo(LANES[0]-laneHalf, LANE_MERGE_Y); g.lineTo(LANES[2]+laneHalf, LANE_MERGE_Y);
+  g.lineStyle(0);
+  // 传送门：左路(LANES[0])蓝色 + 右路(LANES[2])橙红 + 中路绿色（下移2格）
+  const portalY = HEX_SIZE * 2;
+  const pr = HEX_SIZE * 1.8;
+  // 左路传送门
+  g.lineStyle(3, 0x44aaff, 0.85); g.beginFill(0x44aaff, 0.12); g.drawCircle(LANES[0], portalY, pr); g.endFill(); g.lineStyle(0);
+  g.lineStyle(2, 0x44aaff, 0.5); g.drawCircle(LANES[0], portalY, pr*0.5); g.lineStyle(0);
+  // 右路传送门
+  g.lineStyle(3, 0xff5533, 0.85); g.beginFill(0xff5533, 0.12); g.drawCircle(LANES[2], portalY, pr); g.endFill(); g.lineStyle(0);
+  g.lineStyle(2, 0xff5533, 0.5); g.drawCircle(LANES[2], portalY, pr*0.5); g.lineStyle(0);
+  // 中路传送门（绿色，与左右路同高）
+  const cPortalY = HEX_SIZE*2.5;
+  g.lineStyle(3, 0x44ff99, 0.85); g.beginFill(0x44ff99, 0.1); g.drawCircle(cx, cPortalY, pr); g.endFill(); g.lineStyle(0);
+  g.lineStyle(2, 0x44ff99, 0.45); g.drawCircle(cx, cPortalY, pr*0.5); g.lineStyle(0);
+  worldC.addChild(g);
+}
+
+function drawWall(){
+  if(!wallGfx) return;
+  wallGfx.clear();
+  const outerCells = hexCells.filter(c=>c.state!=='base');
+  if(!outerCells.length) return;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity;
+  for(const c of outerCells){ minX=Math.min(minX,c.px); maxX=Math.max(maxX,c.px); minY=Math.min(minY,c.py); }
+  const wallColor = wallFlash > 0 ? 0xff3333 : 0x4a6a7a;
+  const wallAlpha = wallFlash > 0 ? 0.8 : 0.5;
+  const pad = HEX_SIZE + 8;
+  const wcx = (minX+maxX)/2, wTop = minY - pad, wBottom = cy + pad/2;
+  const wHalf = (maxX-minX)/2 + pad;
+  wallGfx.lineStyle(3, wallColor, wallAlpha);
+  wallGfx.moveTo(wcx - wHalf, wBottom);
+  wallGfx.bezierCurveTo(wcx - wHalf, wTop - 20, wcx + wHalf, wTop - 20, wcx + wHalf, wBottom);
+  // 底部横杆
+  wallGfx.lineStyle(4, wallColor, wallAlpha * 0.7);
+  wallGfx.moveTo(wcx - wHalf - 5, wBottom + 4);
+  wallGfx.lineTo(wcx + wHalf + 5, wBottom + 4);
+}
+
+function drawCell(cell){
+  const g=cell.bg, s=HEX_SIZE;
+  g.clear();
+  while(cell.cont.children.length>1) cell.cont.removeChildAt(1);
+
+  const poly = hexCorners(s);
+
+  if(cell.state==='base'){
+    g.beginFill(0xffd24a,0.3); g.lineStyle(3,0xffd24a,0.9);
+    g.drawPolygon(poly); g.endFill();
+    const glow=new PIXI.Graphics(); glow.lineStyle(2,0xffd24a,0.5); glow.drawCircle(0,0,HEX_SIZE+6);
+    cell.cont.addChild(glow);
+    const t=new PIXI.Text('少',{fontSize:20,fill:'#ffd24a',fontWeight:'900'}); t.anchor.set(0.5); t.y=-5; cell.cont.addChild(t);
+    const lvlT=new PIXI.Text('Lv'+baseLvl,{fontSize:9,fill:'#ffd24a',fontWeight:'700'}); lvlT.anchor.set(0.5); lvlT.y=11; cell.cont.addChild(lvlT);
+  } else if(cell.state==='locked'){
+    g.beginFill(0x0a0f12,0.4); g.lineStyle(1,0x151f25);
+    g.drawPolygon(poly); g.endFill();
+  } else if(cell.state==='flippable'){
+    g.beginFill(0x1c2a33); g.lineStyle(1.5,0x2c3f4b);
+    g.drawPolygon(poly); g.endFill();
+    const t=new PIXI.Text('?',{fontSize:16,fill:'#3a5060',fontWeight:'800'}); t.anchor.set(0.5); cell.cont.addChild(t);
+  } else if(cell.state==='empty'){
+    g.beginFill(0x1c2a33,0.5); g.lineStyle(1,0x2c3f4b,0.4);
+    g.drawPolygon(poly); g.endFill();
+    const t=new PIXI.Text('↺',{fontSize:13,fill:'#3a5060'}); t.anchor.set(0.5); cell.cont.addChild(t);
+  } else if(cell.state==='revealed'){
+    const bt = B_TYPES.find(b=>b.key===cell.category) || B_TYPES[0];
+    const gen = cell.general;
+    const isMaxLvl = cell.lvl >= TUNE.maxLvl && gen;
+    // 分级配色：Lv1暗/细框 → Lv2适中 → Lv3亮/粗框 → Lv4特效
+    const alphaArr=[0,0.12,0.28,0.46]; const bwArr=[0,1.5,2.5,3]; const baArr=[0,0.5,0.85,1];
+    const alpha = isMaxLvl ? 0.55 : (alphaArr[cell.lvl]??0.12);
+    const bw    = isMaxLvl ? 3    : (bwArr[cell.lvl]??1.5);
+    const ba    = isMaxLvl ? 1    : (baArr[cell.lvl]??0.5);
+    g.beginFill(bt.hex, alpha); g.lineStyle(bw, bt.hex, ba);
+    g.drawPolygon(poly); g.endFill();
+
+    if(isMaxLvl){
+      const glow=new PIXI.Graphics(); glow.lineStyle(2, bt.hex, 0.45); glow.drawCircle(0,0,HEX_SIZE+5);
+      cell.cont.addChild(glow);
+    }
+
+    const glyph = gen ? gen.glyph : bt.glyph;
+    const glyphColor = isMaxLvl ? '#ffd24a' : bt.css;
+    const t=new PIXI.Text(glyph,{fontSize:16,fill:glyphColor,fontWeight:'800'}); t.anchor.set(0.5); t.y=-4; cell.cont.addChild(t);
+    const label = isMaxLvl ? gen.name : 'Lv'+cell.lvl+' '+(gen?gen.name:'');
+    const labelColor = isMaxLvl ? '#ffd24a' : '#ccc';
+    const lvlT=new PIXI.Text(label,{fontSize:9,fill:labelColor,fontWeight:'600'}); lvlT.anchor.set(0.5); lvlT.y=12; cell.cont.addChild(lvlT);
+
+    // 等级点（Lv2=2点, Lv3=3点，帮助辨认合成目标）
+    if(!isMaxLvl && cell.lvl>=2){
+      for(let pip=0;pip<cell.lvl;pip++){
+        const px=(pip-(cell.lvl-1)/2)*7, py=HEX_SIZE*0.62;
+        const pG=new PIXI.Graphics(); pG.beginFill(bt.hex,0.9); pG.drawCircle(px,py,2.5); pG.endFill();
+        cell.cont.addChild(pG);
+      }
+    }
+
+    // 常驻合成提示：场上存在同将同级可配对时显示黄色外框
+    const canMerge = !isMaxLvl && hexCells.some(c=>c!==cell&&c.state==='revealed'&&c.lvl===cell.lvl&&c.building===cell.building&&c.lvl<TUNE.maxLvl);
+    if(canMerge){
+      const mg=new PIXI.Graphics(); mg.lineStyle(2,0xffdd00,0.75); mg.drawPolygon(hexCorners(HEX_SIZE+3));
+      mg.name='mergeReady'; cell.cont.addChild(mg);
+    }
+  }
+
+  if(cell===selectedCell && cell.state==='revealed'){
+    const sel=new PIXI.Graphics(); sel.lineStyle(3,0xffd24a); sel.drawPolygon(hexCorners(s+2)); cell.cont.addChild(sel);
+  }
+}
+
+// ===== 点击逻辑 =====
+function onCellClick(cell){
+  if(gameOver || pendingPick) return;
+  ensureAudio();
+
+  if(mergeMode && selectedCell){
+    if(cell===selectedCell){ cancelMerge(); return; }
+    if(cell.state==='revealed' && cell.lvl===selectedCell.lvl && cell.lvl<TUNE.maxLvl && cell.building===selectedCell.building){
+      doMerge(selectedCell, cell); return;
+    }
+    cancelMerge(); return;
+  }
+
+  if(cell.state==='flippable' || cell.state==='empty'){
+    const _np = FLIP_PRICES[Math.min(totalFlips, FLIP_PRICES.length-1)];
+    if(gold < _np){
+      spawnFloat(cell.px, cell.py-20, '需要'+_np+'G', 0xff8844);
+      blip(200, 0.05, 'sine', 0.06);
+      return;
+    }
+    flipCell(cell);
+  } else if(cell.state==='revealed' && cell.lvl<TUNE.maxLvl){
+    startMerge(cell);
+  }
+}
+
+function startMerge(cell){
+  selectedCell=cell; mergeMode=true;
+  drawCell(cell);
+  document.getElementById('mergeHint').style.display='block';
+  for(const c of hexCells){
+    if(c===cell) continue;
+    if(c.state==='revealed' && c.lvl===cell.lvl && c.lvl<TUNE.maxLvl && c.building===cell.building){
+      const hl=new PIXI.Graphics(); hl.lineStyle(2.5,0xffd24a,0.9); hl.drawPolygon(hexCorners(HEX_SIZE-1));
+      hl.name='mergeHL'; c.cont.addChild(hl);
+    } else if(c.state==='revealed' || c.state==='flippable' || c.state==='empty'){
+      const dim=new PIXI.Graphics(); dim.beginFill(0x000000,0.45); dim.drawPolygon(hexCorners(HEX_SIZE));
+      dim.name='mergeDim'; c.cont.addChild(dim);
+    }
+  }
+}
+
+function cancelMerge(){
+  if(selectedCell) drawCell(selectedCell);
+  selectedCell=null; mergeMode=false;
+  document.getElementById('mergeHint').style.display='none';
+  for(const c of hexCells){
+    const hl=c.cont.getChildByName('mergeHL');
+    if(hl) c.cont.removeChild(hl);
+    const dim=c.cont.getChildByName('mergeDim');
+    if(dim) c.cont.removeChild(dim);
+  }
+}
+
+function doMerge(source, target){
+  target.lvl++;
+
+  const gen = target.general;
+  const bt = B_TYPES.find(b=>b.key===target.category);
+
+  source.state='empty'; source.building=null; source.category=null; source.lvl=0; source.general=null; source.generalOut=false; source.generalRespawnTimer=0;
+  cancelMerge();
+  drawCell(source); drawCell(target);
+  for(const c of hexCells) if(c!==source&&c!==target&&c.state==='revealed') drawCell(c);
+
+  const isMaxLvl = target.lvl >= TUNE.maxLvl;
+  burstSound(target.lvl);
+
+  if(isMaxLvl){
+    target.cont.scale.set(1.45);
+    setTimeout(()=>target.cont.scale.set(1), 220);
+    shake=14;
+    for(let i=0;i<4;i++) setTimeout(()=>burstSound(4), i*110);
+    if(gen){
+      spawnFloat(target.px, target.py-52, gen.name + ' 降临！', 0xffd24a);
+      spawnFloat(target.px, target.py-28, gen.desc, bt ? bt.hex : 0xffd24a);
+      // Lv4爆点：触发该武将专属强化选择
+      showGeneralUpgradePick(gen);
+    }
+  } else {
+    target.cont.scale.set(1.25);
+    setTimeout(()=>target.cont.scale.set(1), 130);
+    if(gen && bt){
+      spawnFloat(target.px, target.py-28, gen.glyph+' Lv'+target.lvl, bt.hex);
+    }
+  }
+
+  // 合成只影响战力，不再触发升级（升级由翻牌次数驱动）
+  updateHUD();
+  drawWall();
+  // 引导步骤推进
+  if(guideStep===1){
+    guideStep=2;
+    clearGuidePulses();
+    hideGuideHint();
+  }
+}
+
+// ===== 武将降临（随机从同类已选将中分配） =====
+function showGeneralPick(cell, bt){
+  const pool = draftPicks.filter(g => g.category === bt.key);
+  const gen = pool.length > 0
+    ? pool[Math.floor(Math.random()*pool.length)]
+    : GENERALS[bt.key][Math.floor(Math.random()*GENERALS[bt.key].length)];
+  cell.general = gen;
+  drawCell(cell);
+  spawnFloat(cell.px, cell.py-52, gen.name + ' 降临！', 0xffd24a);
+  spawnFloat(cell.px, cell.py-28, gen.desc, bt.hex);
+  burstSound(4);
+  updateHUD();
+}
+
+// ===== 武将升满Lv4时的专属强化选择 =====
+function showGeneralUpgradePick(gen){
+  const upgrades = GENERAL_UPGRADES[gen.key] || [];
+  // 过滤已选中的词条
+  const available = upgrades.filter(u => !globalBuffs[u.key]);
+  if(available.length === 0) return; // 两条都选过了，跳过
+
+  pendingPick = { type:'generalUpgrade', options: available };
+  const overlay = document.getElementById('pickOverlay');
+  const title = document.getElementById('pickTitle');
+  const optDiv = document.getElementById('pickOptions');
+  title.textContent = gen.name + ' 降临强化 —— 选择专属技能';
+  optDiv.innerHTML = '';
+  available.forEach((buff, idx) => {
+    const card = document.createElement('div');
+    card.className = 'pick-card';
+    card.innerHTML = `<div class="pick-icon">${buff.icon}</div><div class="pick-name">${buff.name}</div><div class="pick-desc">${buff.desc}</div>`;
+    card.onclick = () => pickBuff(idx);
+    optDiv.appendChild(card);
+  });
+  overlay.style.display = 'flex';
+}
+
+// ===== 通用词条选择（基地升级时） =====
+function buildBuffPool(){
+  const pool = [...BUFF_POOL_COMMON];
+  const usedKeys = new Set(Object.keys(globalBuffs));
+  // 少年强化词条
+  for(const u of SHAONIAN_UPGRADES){ if(!usedKeys.has(u.key)) pool.push(u); }
+  for(const gen of draftPicks){
+    const upgrades = GENERAL_UPGRADES[gen.key] || [];
+    for(const u of upgrades){
+      if(!usedKeys.has(u.key)) pool.push(u);
+    }
+  }
+  return pool;
+}
+
+function showBuffPick(){
+  const pool = buildBuffPool();
+  const options = shuffle(pool).slice(0, 3);
+  pendingPick = { type:'buff', options };
+  const overlay = document.getElementById('pickOverlay');
+  const title = document.getElementById('pickTitle');
+  const optDiv = document.getElementById('pickOptions');
+  title.textContent = '基地升级奖励 —— 选择增益';
+  optDiv.innerHTML = '';
+  options.forEach((buff, idx) => {
+    const card = document.createElement('div');
+    card.className = 'pick-card';
+    card.innerHTML = `<div class="pick-icon">${buff.icon}</div><div class="pick-name">${buff.name}</div><div class="pick-desc">${buff.desc}</div>`;
+    card.onclick = () => pickBuff(idx);
+    optDiv.appendChild(card);
+  });
+  // 广告刷新按钮（每局3次）+ 我全都要（每局1次）
+  const rerollRow = document.createElement('div');
+  rerollRow.style.cssText = 'width:100%;display:flex;gap:10px;justify-content:center;align-items:flex-end;margin-top:12px;flex-wrap:wrap;';
+  const remaining = 1 - buffRerollUsed;
+  const rerollStyle = remaining <= 0 ? 'opacity:0.4;cursor:default;' : 'cursor:pointer;';
+  const takeAllStyle = takeAllUsed ? 'opacity:0.35;cursor:default;' : 'cursor:pointer;';
+  rerollRow.innerHTML = `
+    <button id="rerollBtn" onclick="rerollBuff()" style="background:#162e1e;color:#6fe89a;border:1px solid #2e6640;border-radius:6px;padding:6px 14px;font-size:12px;${rerollStyle}">📺 看广告刷新 (${remaining}/1)</button>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <button onclick="pickAllBuffs()" style="background:#2a3a10;color:#ffd24a;border:2px solid #8a9a22;border-radius:8px;padding:9px 22px;font-size:15px;font-weight:700;${takeAllStyle}">✨ 我全都要${takeAllUsed?' (已使用)':''}</button>
+      <div style="font-size:10px;color:#5a8a9a;">💎 购买终身卡，每局1次</div>
+    </div>`;
+  optDiv.appendChild(rerollRow);
+  overlay.style.display = 'flex';
+}
+
+function rerollBuff(){
+  if(buffRerollUsed >= 1) return;
+  buffRerollUsed++;
+  showBuffPick();
+}
+
+function pickAllBuffs(){
+  if(!pendingPick || takeAllUsed) return;
+  takeAllUsed = true;
+  const { options } = pendingPick;
+  for(const buff of options){
+    if(globalBuffs[buff.key]) continue;
+    globalBuffs[buff.key] = true;
+    if(buff.apply) buff.apply(globalBuffs);
+    if(buff.applyCell){ for(const cell of hexCells) buff.applyCell(cell, globalBuffs); }
+    appliedBuffs.push(buff);
+    spawnFloat(cx + (Math.random()-0.5)*60, cy - 70 + (Math.random()-0.5)*20, buff.icon + ' ' + buff.name, 0x4aff8a);
+  }
+  pendingPick = null;
+  document.getElementById('pickOverlay').style.display = 'none';
+  burstSound(3); updateHUD();
+}
+
+function pickBuff(idx){
+  const { options } = pendingPick;
+  const buff = options[idx];
+  globalBuffs[buff.key] = true;
+  if(buff.apply) buff.apply(globalBuffs);
+  if(buff.applyCell){
+    for(const cell of hexCells) buff.applyCell(cell, globalBuffs);
+  }
+  appliedBuffs.push(buff);
+  pendingPick = null;
+  document.getElementById('pickOverlay').style.display = 'none';
+  spawnFloat(cx, cy-70, buff.icon + ' ' + buff.name, 0x4aff8a);
+  burstSound(2);
+  updateHUD();
+}
+
+function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+// ===== 翻格 =====
+function flipCell(cell){
+  const pool = draftPicks.length > 0 ? draftPicks : [...GENERALS.advance, ...GENERALS.defense];
+  const gen = pool[Math.floor(Math.random()*pool.length)];
+  cell.building = gen.key;
+  cell.category = gen.category;
+  cell.general = gen;
+  cell.lvl = globalBuffs.flipMinLvl || 1;
+  cell.state = 'revealed';
+  if(cell.cdArc) cell.cdArc.clear();
+  cell.generalOut = false;
+  cell.generalRespawnTimer = 0;
+  drawCell(cell);
+
+  totalFlips++;
+  const _priceIdx = Math.min(totalFlips - 1, FLIP_PRICES.length - 1);
+  const _price = FLIP_PRICES[_priceIdx];
+  gold -= _price; goldSpent += _price;
+  blip(480+Math.random()*80, 0.06, 'triangle', 0.12);
+  cell.cont.scale.set(1.15); setTimeout(()=>cell.cont.scale.set(1),100);
+  const bt = B_TYPES.find(b=>b.key===gen.category);
+  spawnFloat(cell.px, cell.py-24, gen.glyph, bt ? bt.hex : 0xffffff);
+  drawCell(cell);
+  for(const c of hexCells) if(c!==cell&&c.state==='revealed') drawCell(c);
+
+  checkLevelUp();
+  updateHUD();
+  // 引导步骤推进
+  if(guideStep===0){
+    guideStep=1;
+    clearGuidePulses();
+    showGuideHint('☝ 点击武将格，再点同种同级格 → 合并升阶');
+  }
+}
+
+// ===== 基地升级（格子耗尽触发） =====
+// ===== 基地升级（翻牌累计次数触发，而非铺满地块） =====
+function checkLevelUp(){
+  if(pendingPick) return;
+  const upDone = baseLvl - 1; // 已完成的升级次数
+  if(upDone >= UPGRADE_FLIPS.length) return; // 升级次数已达上限
+  if(totalFlips < UPGRADE_FLIPS[upDone]) return; // 还没翻够
+  if(!hexCells.some(c => c.state==='locked')) return; // 没有可解锁的地格
+  baseLvl++;
+  const _bc=hexCells.find(c=>c.state==='base'); if(_bc) drawCell(_bc);
+  unlockRing();
+  spawnFloat(cx, cy-55, '基地 Lv'+baseLvl+'!', 0xffd24a);
+  burstSound(3); shake=5;
+  updateHUD();
+  showBuffPick();
+}
+
+function unlockRing(){
+  // 后排→前排解锁：按 py 降序（下方/靠近基地的先开），同 y 的左右对一起开
+  const locked = hexCells.filter(c=>c.state==='locked')
+    .sort((a,b) => {
+      if(Math.abs(a.py - b.py) > 0.5) return b.py - a.py; // py 大(靠下/后排)优先
+      return Math.abs(a.px - cx) - Math.abs(b.px - cx);   // 同排时左右对称
+    });
+  if(!locked.length) return;
+  // 平滑解锁曲线：把剩余地格均摊到剩余的升级次数上（9格/5次 → 2/2/2/2/1）
+  const done = baseLvl - 1;                              // 含本次在内已完成的升级数
+  const upgradesLeftIncl = Math.max(1, UPGRADE_FLIPS.length - done + 1);
+  const count = Math.min(locked.length, Math.ceil(locked.length / upgradesLeftIncl));
+  for(let i=0; i<count; i++){
+    locked[i].state = 'flippable';
+    drawCell(locked[i]);
+  }
+}
+
+// ===== 敌人 =====
+const LANE_NAMES = ['左路', '中路', '右路'];
+const WAVE_TYPES = [
+  { key:'normal', name:'常规', countMul:1.0, hpMul:1.0,  spdMul:1.0,  color:0xff3333, size:8 },
+  { key:'swarm',  name:'人海', countMul:2.5, hpMul:0.6,  spdMul:1.1,  color:0xff6633, size:6 },
+  { key:'elite',  name:'精英', countMul:0.15,hpMul:10.0, spdMul:0.3, color:0xcc00ff, size:16, noAttack:true },
+  { key:'speed',  name:'疾行', countMul:1.0, hpMul:0.6,  spdMul:1.9,  color:0x33ffaa, size:7 },
+];
+
+function lvlScale(lvl){ return Math.pow(1.7, lvl - 1); }
+
+function spawnWave(){
+  if(gameOver) return;
+  waveCount++;
+  if(waveCount > 15){
+    // 所有波次已发完，等场上清空再胜利
+    spawnFloat(cx, cy-80, '最终波已结束！清空残敌！', 0xffd24a);
+    return;
+  }
+
+  // BOSS波：第8波固定出曹操（15波弧线中点），替换当波普通怪
+  if(waveCount === 8){ spawnBoss(); return; }
+
+  const hpBase = waveCount <= 3
+    ? Math.round((15 + waveCount * 8) * 0.9)
+    : Math.round(40 * Math.pow(1.35, waveCount - 3) * 0.9);
+  const baseCount = 1 + Math.floor(waveCount * 0.6);
+
+  // 最后几波（≥13）：分三级人海冲锋，逐波递增
+  if(waveCount >= 13){
+    const swarm = WAVE_TYPES[1], normal = WAVE_TYPES[0];
+    const lanes = waveCount >= 14 ? [0,1,2] : [0,2];
+    const capCnt = waveCount===13 ? 12 : waveCount===14 ? 15 : 18;
+    const extraMul = waveCount===15 ? 1.1 : 1.0;
+    spawnFloat(cx, cy - 100, '波次'+waveCount+' · ⚠人海冲锋 ×'+lanes.length+'路', 0xff3399, {life:180,fontSize:15});
+    for(const ln of lanes){
+      const wt = (ln===1) ? normal : swarm;
+      const cnt = Math.max(3, Math.min(capCnt, Math.round(baseCount * wt.countMul * extraMul)));
+      spawnGroup(wt, Math.round(hpBase*wt.hpMul), cnt, ln);
+    }
+    return;
+  }
+
+  // 波次类型：1-7波顺序循环(固定手感)，8波后随机；≥14波禁精英
+  const allowedTypes = waveCount >= 14 ? [0, 1, 3] : [0, 1, 2, 3];
+  const typeIdx = waveCount <= 7 ? (waveCount - 1) % 4 : allowedTypes[Math.floor(Math.random()*allowedTypes.length)];
+  const wt = WAVE_TYPES[typeIdx];
+  const hp = Math.round(hpBase * wt.hpMul);
+  const count = Math.max(3, Math.min(18, Math.round(baseCount * wt.countMul)));
+  const laneIdx = (typeIdx === 2) ? (eliteLaneCycle++ % 3) : Math.floor(Math.random()*3);
+  spawnFloat(cx, cy - 100, '波次'+waveCount+' · '+wt.name+' ['+LANE_NAMES[laneIdx]+']', wt.color, {life:180,fontSize:15});
+  spawnFloat(LANES[laneIdx], 32, '▼ '+LANE_NAMES[laneIdx], wt.color, {life:150,fontSize:14});
+  spawnGroup(wt, hp, count, laneIdx);
+
+  // 波次5-7：延迟2s出疾行斥候，填补BOSS前的送金空窗
+  if(waveCount >= 5 && waveCount <= 7 && typeIdx !== 3){
+    const spd = WAVE_TYPES[3]; // 疾行
+    const bonusLane = (laneIdx + 1 + Math.floor(Math.random()*2)) % 3;
+    const bonusCnt = 2 + (waveCount - 4); // 3/4/5只
+    setTimeout(()=>{ if(!gameOver) spawnGroup(spd, Math.round(hpBase*spd.hpMul*0.8), bonusCnt, bonusLane); }, 2000);
+    spawnFloat(LANES[bonusLane], 40, '⚡斥候', spd.color, {life:120,fontSize:12});
+  }
+  // 精英波：添加速度缓慢的随行护卫（簇拥精英）
+  if(typeIdx === 2){
+    const escortWt = { key:'normal', name:'随行', countMul:1, hpMul:1, spdMul:0.25, color:0xcc88ff, size:6, noAttack:false };
+    spawnGroup(escortWt, Math.round(hpBase*2), 2, laneIdx);
+  }
+}
+
+function spawnGroup(wt, hp, count, laneIdx){
+  const laneX = LANES[laneIdx!=null ? laneIdx : 1];
+  const laneHalf = (LANES[1]-LANES[0]) * 0.4; // 路内横向散布
+  const diffMul = 1 + (difficulty - 1) * 0.03;
+  const scaledHp = Math.round(hp * diffMul);
+  for(let i=0;i<count;i++){
+    const spread = laneHalf * 0.5;
+    const sx = laneX + (Math.random()-0.5)*spread;
+    const sy = laneIdx === 1
+             ? HEX_SIZE*2.5 + (Math.random()-0.5)*HEX_SIZE  // 中路：传送门位置（上移2格）
+             : HEX_SIZE*2 + (Math.random()-0.5)*HEX_SIZE;   // 左右路：传送门位置
+    const waveSpdMul = 1 + Math.floor(waveCount / 3) * 0.05;
+    const earlyWaveBoost = waveCount <= 2 ? 2.0 : 1.0; // 前两波走快一倍，尽早送金币
+    const spd = TUNE.enemySpd * wt.spdMul * waveSpdMul * earlyWaveBoost * (0.85+Math.random()*0.3);
+    const e = { x:sx, y:sy, hp:scaledHp, maxHp:scaledHp, speed:spd, cont:null, laneX, waveType:wt.key, noAttack:wt.noAttack||false, size:wt.size||8 };
+
+    const cont=new PIXI.Container(); cont.x=sx; cont.y=sy;
+    const body=new PIXI.Graphics(); body.beginFill(wt.color); body.drawCircle(0,0,wt.size); body.endFill(); cont.addChild(body);
+    const statusRing=new PIXI.Graphics(); cont.addChild(statusRing); e.statusRing=statusRing;
+    const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-12,16,3); hpBg.endFill(); cont.addChild(hpBg);
+    const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
+    e.hpFill=hpFill; e.cont=cont;
+    updateEnemyHP(e);
+    enemyC.addChild(cont);
+    enemies.push(e);
+  }
+}
+
+// ===== BOSS：第10波·曹操 =====
+function spawnBoss(){
+  const hpBase = Math.round(40 * Math.pow(1.35, waveCount - 3));
+  const hp = Math.round(hpBase * 30); // 第5波≈2187，可在4~5波内被磨死；靠清怪附带AOE
+  const size = 22;
+  const sx = cx, sy = -HEX_SIZE * 2;
+  const e = { x:sx, y:sy, hp:hp, maxHp:hp, speed:0.267, cont:null, laneX:cx,
+    isBoss:true, immuneTaunt:true, name:'曹操', size, skillTimer:0, basicTimer:0 };
+
+  const cont=new PIXI.Container(); cont.x=sx; cont.y=sy;
+  const body=new PIXI.Graphics();
+  body.beginFill(0xffa500); body.lineStyle(2.5,0xfff0c0,0.9); body.drawCircle(0,0,size); body.endFill();
+  cont.addChild(body);
+  const statusRing=new PIXI.Graphics(); cont.addChild(statusRing); e.statusRing=statusRing;
+  const crown=new PIXI.Text('♛',{fontSize:18,fill:'#fff0c0',fontWeight:'800'}); crown.anchor.set(0.5); crown.y=-1; cont.addChild(crown);
+  const nameT=new PIXI.Text('魏王·曹操',{fontSize:12,fill:'#ffd24a',fontWeight:'800',stroke:'#000',strokeThickness:3}); nameT.anchor.set(0.5); nameT.y=-size-13; cont.addChild(nameT);
+  const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-24,-size-7,48,4); hpBg.endFill(); cont.addChild(hpBg);
+  const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
+  e.hpFill=hpFill; e.cont=cont;
+  updateEnemyHP(e);
+  enemyC.addChild(cont);
+  enemies.push(e);
+  boss = e;
+  // BOSS随行护卫：4个低速橙色护卫簇拥
+  const guardHp = Math.round(40 * Math.pow(1.35, waveCount - 3) * 0.6);
+  const guardWt = { key:'normal', name:'护卫', countMul:1, hpMul:1, spdMul:0.22, color:0xff9933, size:7, noAttack:false };
+  spawnGroup(guardWt, guardHp, 4, 1);
+  spawnFloat(cx, cy-120, '⚠ BOSS 降临 · 魏王曹操', 0xffa500);
+  shake=12; burstSound(4);
+}
+
+function onBossDeath(e){
+  boss = null;
+  if(bossAoe){ if(bossAoe.gfx) projC.removeChild(bossAoe.gfx); bossAoe = null; }
+  shake = 26;
+  spawnFloat(e.x, e.y-34, '曹操已退！', 0xffa500);
+  burstSound(5);
+  for(let i=0;i<16;i++){
+    const ang=(Math.PI*2/16)*i;
+    spawnFloat(e.x+Math.cos(ang)*34, e.y+Math.sin(ang)*34, '✦', 0xffd24a);
+  }
+  // 掉落强化宝箱：点击开出三选一（不再立即弹）
+  spawnBossChest(e.x, Math.min(e.y, cy - HEX_SIZE*3));
+}
+
+// ===== 强化宝箱（boss掉落，点击开箱→三选一） =====
+function spawnBossChest(x, y){
+  if(bossChest) return;
+  const cont = new PIXI.Container(); cont.x=x; cont.y=y;
+  cont.interactive=true; cont.cursor='pointer';
+  cont.hitArea = new PIXI.Circle(0,0,36);
+  // 光柱
+  const beam = new PIXI.Graphics();
+  beam.beginFill(0xffd24a, 0.18); beam.drawRect(-8, -90, 16, 90); beam.endFill();
+  beam.beginFill(0xffd24a, 0.08); beam.drawRect(-18, -90, 36, 90); beam.endFill();
+  cont.addChild(beam);
+  // 脉冲发光圈（动态更新）
+  const glow = new PIXI.Graphics(); glow.name='chestGlow'; cont.addChild(glow);
+  // 宝箱本体
+  const g=new PIXI.Graphics();
+  g.beginFill(0x7a4515); g.lineStyle(3,0xffd24a,1); g.drawRoundedRect(-18,-14,36,28,5); g.endFill();
+  g.lineStyle(2,0xffd24a,0.9); g.moveTo(-18,-2); g.lineTo(18,-2);
+  g.beginFill(0xffd24a); g.drawRect(-5,-8,10,10); g.endFill();
+  g.lineStyle(0); g.beginFill(0xffaa22,0.5); g.drawCircle(0,-2,4); g.endFill();
+  cont.addChild(g);
+  const t=new PIXI.Text('点击开启！',{fontSize:12,fill:'#ffd24a',fontWeight:'900',stroke:'#000',strokeThickness:3});
+  t.anchor.set(0.5); t.y=-32; cont.addChild(t);
+  cont.on('pointerdown', ()=>openBossChest());
+  floatC.addChild(cont);
+  bossChest = { cont, baseX:x, baseY:y, animTimer:0 };
+  spawnFloat(x, y-56, '★ 强化宝箱掉落！', 0x4aff8a);
+  spawnFloat(x, y-72, '点击开启', 0xffd24a);
+}
+
+function openBossChest(){
+  if(!bossChest || pendingPick) return;
+  floatC.removeChild(bossChest.cont);
+  bossChest = null;
+  burstSound(3); shake=6;
+  showBuffPick(); // 已是三选一
+}
+
+function updateEnemyHP(e){
+  const pct=Math.max(0,e.hp/e.maxHp);
+  if(e.isBoss){
+    e.hpFill.clear(); e.hpFill.beginFill(0xff3333); e.hpFill.drawRect(-24,-e.size-7,48*pct,4); e.hpFill.endFill();
+    return;
+  }
+  e.hpFill.clear(); e.hpFill.beginFill(0xff5555); e.hpFill.drawRect(-8,-12,16*pct,3); e.hpFill.endFill();
+}
+
+function removeEnemy(idx){
+  const e=enemies[idx];
+  if(e && e.isBoss) onBossDeath(e);
+  else if(e && e.waveType && GOLD_PER_KILL[e.waveType]){
+    const drop = Math.round(waveCount * GOLD_PER_KILL[e.waveType] * TUNE.goldMul);
+    if(drop > 0){
+      gold += drop; goldEarned += drop;
+      if(drop >= 20) spawnFloat(e.x, e.y-14, '+'+drop+'G', 0xffd24a);
+      updateHUD();
+    }
+  }
+  enemyC.removeChild(enemies[idx].cont); enemies.splice(idx,1);
+}
+
+// ===== 战斗 tick =====
+let attackTimers = {};
+
+function tick(dt){
+  if(gameOver || pendingPick) return;
+
+  // 横向滚动偏移已移除，所有容器固定在0
+  bgHexC.x = worldC.x = enemyC.x = projC.x = floatC.x = 0;
+
+  if(shake>0){ worldC.x=(Math.random()-0.5)*shake; worldC.y=(Math.random()-0.5)*shake; shake*=0.84; if(shake<0.3){shake=0;worldC.y=0;worldC.x=0;} }
+
+  // 城墙受击闪红衰减
+  if(wallFlash>0){ wallFlash--; drawWall(); }
+
+  // 宝箱动画：脉冲缩放+抖动+发光圈
+  if(bossChest){
+    bossChest.animTimer += app.ticker.deltaMS;
+    const at = bossChest.animTimer;
+    const pulse = 1 + Math.sin(at/220)*0.13;
+    bossChest.cont.scale.set(pulse);
+    bossChest.cont.rotation = Math.sin(at/160)*0.1;
+    const glow = bossChest.cont.getChildByName('chestGlow');
+    if(glow){
+      glow.clear();
+      const a1 = 0.35 + Math.abs(Math.sin(at/280))*0.55;
+      glow.lineStyle(4, 0xffd24a, a1); glow.drawCircle(0, 0, 22+Math.sin(at/190)*5);
+      glow.lineStyle(2, 0xffaa22, a1*0.7); glow.drawCircle(0, 0, 32+Math.sin(at/190+1)*5);
+    }
+  }
+
+  // 金币不足视觉：橙色虚线六边形框
+  const _nextFlipPrice = FLIP_PRICES[Math.min(totalFlips, FLIP_PRICES.length-1)];
+  const _canAfford = gold >= _nextFlipPrice;
+  if(!_canAfford){
+    for(const cell of hexCells){
+      if(cell.state!=='flippable' && cell.state!=='empty') continue;
+      if(!cell.cdArc) cell.cdArc=new PIXI.Graphics();
+      if(cell.cont.children.indexOf(cell.cdArc)<0) cell.cont.addChild(cell.cdArc);
+      cell.cdArc.clear();
+      cell.cdArc.lineStyle(2, 0xff8844, 0.45);
+      cell.cdArc.drawPolygon(hexCorners(HEX_SIZE-3));
+    }
+  } else {
+    for(const cell of hexCells){ if(cell.cdArc) cell.cdArc.clear(); }
+  }
+
+  // 金币仅来源于击杀怪物（涓流已移除）
+
+  // 少年·城墙修复：每5秒回复10HP
+  if(globalBuffs.wallRegen_shaonian && baseHP < maxHP){
+    wallRegenTimer += app.ticker.deltaMS;
+    if(wallRegenTimer >= 5000){ wallRegenTimer -= 5000; baseHP = Math.min(maxHP, baseHP + 10); spawnFloat(cx, cy - 42, '+10 城修', 0x44ff99); updateHUD(); }
+  }
+
+  waveTimer += app.ticker.deltaMS;
+  const _curWaveMs = waveCount <= 6 ? 9000 : waveCount <= 12 ? 10000 : 8000;
+  if(waveTimer>=_curWaveMs && !inDraft){ waveTimer=0; spawnWave(); }
+  // 胜利判断：15波全部发完 + 场上无残敌
+  if(waveCount > 15 && enemies.length === 0){ winGame(); return; }
+  const wtimerEl=document.getElementById('waveTimerEl');
+  if(wtimerEl) wtimerEl.textContent = waveCount>15 ? '清场中' : Math.max(0,Math.ceil((_curWaveMs-waveTimer)/1000))+'s';
+  const wcountEl=document.getElementById('waveCountEl');
+  if(wcountEl){
+    if(boss){ wcountEl.textContent=(waveCount>15?15:waveCount)+'/15 ⚠BOSS'; wcountEl.style.color='#ff5a5a'; }
+    else { wcountEl.textContent = waveCount>15 ? '15/15 ✓' : waveCount+'/15'; wcountEl.style.color=''; }
+  }
+
+  const now=performance.now();
+
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+
+    // 张飞「火爆」灼烧标记：持续伤害（stun不打断）
+    if(e.zhangfeiBurnUntil && now < e.zhangfeiBurnUntil){
+      e._burnTimer=(e._burnTimer||0)+app.ticker.deltaMS;
+      if(e._burnTimer>=500){ e._burnTimer=0; e.hp-=e._burnDmg||0;
+        spawnFloat(e.x,e.y-10,Math.round(e._burnDmg||0)+'🔥',0xff6600);
+        if(e.hp<=0){spawnFloat(e.x,e.y-12,'灼杀',0xff6600);removeEnemy(i);continue;}
+        updateEnemyHP(e); }
+    }
+
+    // 诸葛亮中毒：持续伤害（stun不打断）
+    if(e.poisonUntil && now < e.poisonUntil){
+      e._poisonTimer=(e._poisonTimer||0)+app.ticker.deltaMS;
+      if(e._poisonTimer>=500){ e._poisonTimer=0; e.hp-=e.poisonDps||0;
+        spawnFloat(e.x,e.y-10,Math.round(e.poisonDps||0)+'☠',0x44ff88);
+        if(e.hp<=0){spawnFloat(e.x,e.y-12,'毒杀',0x44ff88);removeEnemy(i);continue;}
+        updateEnemyHP(e); }
+    }
+
+    // 减速/中毒/嘲讽持续状态环：青=减速 绿=中毒 橙=被嘲讽
+    if(e.statusRing){
+      const sNow = e.slowUntil && now < e.slowUntil;
+      const pNow = e.poisonUntil && now < e.poisonUntil;
+      const tNow = e._taunted;
+      if(sNow || pNow || tNow){
+        const r=e.statusRing, rr=(e.size||8)+3;
+        r.clear();
+        if(sNow){ r.lineStyle(2,0x66ccff,0.95); r.drawCircle(0,0,rr); }
+        if(pNow){ r.lineStyle(2,0x44ff88,0.9); r.drawCircle(0,0,rr+(sNow?3:0)); }
+        if(tNow){ r.lineStyle(2,0xffaa44,0.95); r.drawCircle(0,0,rr+(sNow?3:0)+(pNow?3:0)); }
+        r.lineStyle(0); r._lit=true;
+      } else if(e.statusRing._lit){ e.statusRing.clear(); e.statusRing._lit=false; }
+    }
+
+    // 许褚击晕/铁锁：冻结中不移动不攻击
+    if(e.stunUntil && now < e.stunUntil) continue;
+    if(e.rooted && e.rootUntil && now < e.rootUntil) continue;
+
+    // 已到达城墙，持续攻击（蔚蓝模式）
+    if(e.attacking){
+      if(e.noAttack){ continue; } // 精英怪：只驻城不攻击，纯压迫感
+      e.atkTimer = (e.atkTimer || 0) + app.ticker.deltaMS;
+      const atkInterval = (globalBuffs.tauntAtkSlow_caoren && e._taunted) ? 3333 : 2000; // 曹仁镇慑：攻速-40%
+      if(e.atkTimer >= atkInterval){
+        e.atkTimer = 0;
+        baseHP -= Math.ceil((1 + waveCount * 0.25) * (1 + (difficulty-1)*0.03));
+        shake=2; wallFlash=6;
+        if(baseHP<=0){ baseHP=0; endGame(); }
+        updateHUD();
+      }
+      continue;
+    }
+
+    // 曹仁亲兵嘲讽：亲兵周围一圈内敌人转向曹仁亲兵（强化后两圈）
+    let moveX = cx, moveY = cy;
+    let taunted = false;
+    if(!e.immuneTaunt){
+      for(const tr of troops){
+        if(tr.srcName!=='曹仁') continue;                        // 所有曹仁亲兵（各等级）都嘲讽
+        const trN = (tr.gen && tr.gen.key==='caoren' && globalBuffs.tauntRangeMul_caoren) ? 2 : 1; // 扩范围强化仅本体(Lv4出将)生效，亲兵恒1圈
+        if(hexDistance(e.x,e.y,tr.x,tr.y) <= trN){ moveX = tr.x; moveY = tr.y; taunted = true; e._taunted=true; break; }
+      }
+    }
+    // 近战亲兵攻击吸引仇恨：受击后跟随目标亲兵2.5秒
+    if(!taunted && e.aggroTroop && now < e.aggroUntil && troops.indexOf(e.aggroTroop)>=0){
+      moveX = e.aggroTroop.x; moveY = e.aggroTroop.y; taunted = true;
+    }
+
+    if(taunted){
+      if(Math.hypot(moveX-e.x,moveY-e.y)<18) continue;
+      const _twp=nextStepCenter(e.x,e.y,moveX,moveY);
+      const dx=_twp.x-e.x, dy=_twp.y-e.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<0.5) continue;
+      const spdScale = globalBuffs.globalSlow || 1;
+      const slowDebuff = (e.slowUntil && now < e.slowUntil) ? Math.max(e.isBoss?0.5:0.15, e.slowFactor) : 1;
+      const spd=e.speed*spdScale*slowDebuff*dt*0.7;
+      e.x+=dx/dist*spd; e.y+=dy/dist*spd;
+      e.cont.x=e.x; e.cont.y=e.y;
+      continue;
+    }
+
+    if(!taunted){
+      e._taunted=false;
+      // 三路推进：汇聚线以上沿本路直下，之后汇聚向基地
+      if(e.y < LANE_MERGE_Y){ moveX = (e.laneX!=null ? e.laneX : cx); moveY = cy; }
+      else { moveX = cx; moveY = cy; }
+    }
+    // 检查是否到达城墙边沿——找最近有效建筑格再推回边沿，跳过merged空格
+    let nearCell=null, nearCD=Infinity;
+    for(const c of hexCells){
+      if(c.state==='locked' || c.state==='empty') continue;
+      const cd = Math.sqrt((e.x-c.px)**2+(e.y-c.py)**2);
+      if(cd < HEX_SIZE + (e.size||8) + 4 && cd < nearCD){ nearCD=cd; nearCell=c; }
+    }
+    if(nearCell){
+      e.attacking = true;
+      e.atkTimer = 0;
+      const minDist = HEX_SIZE + (e.size||8) + 2;
+      if(nearCD < minDist && nearCD > 0.1){
+        const angle = Math.atan2(e.y - nearCell.py, e.x - nearCell.px);
+        e.x = nearCell.px + Math.cos(angle) * minDist;
+        e.y = nearCell.py + Math.sin(angle) * minDist;
+        e.cont.x = e.x; e.cont.y = e.y;
+      }
+    }
+    if(e.attacking) continue;
+
+    // 正常移动（沿六边形格航点推进，X夹限位兜底）
+    const _ewp=nextStepCenter(e.x,e.y,moveX,moveY);
+    const dx=_ewp.x-e.x, dy=_ewp.y-e.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist < 1) continue;
+    const spdScale = globalBuffs.globalSlow || 1;
+    const slowDebuff = (e.slowUntil && now < e.slowUntil) ? Math.max(e.isBoss?0.5:0.15, e.slowFactor) : 1;
+    const spd=e.speed*spdScale*slowDebuff*dt*0.7;
+    e.x+=dx/dist*spd; e.y+=dy/dist*spd;
+    e.cont.x=e.x; e.cont.y=e.y;
+    // 路障限位：汇聚线以上禁止穿越障碍带（使敌人绕路推进）
+    if(e.y < LANE_MERGE_Y){
+      const bW=8;
+      if(e.laneX <= LANES[0]) e.x=Math.min(e.x, LANE_BOUNDS[0]-bW);
+      else if(e.laneX >= LANES[2]) e.x=Math.max(e.x, LANE_BOUNDS[1]+bW);
+      else { e.x=Math.max(LANE_BOUNDS[0]+bW, Math.min(e.x, LANE_BOUNDS[1]-bW)); }
+      e.cont.x=e.x;
+    }
+  }
+
+  // ===== BOSS 攻击：普攻(单体击退) + 技能(锥形≤4击退)，分开避免AOE废掉整片进攻兵营 =====
+  if(boss){
+    // 普攻：每 ~3.5s 选范围内最近 1 个亲兵/士兵击退（单体）
+    boss.basicTimer = (boss.basicTimer||0) + app.ticker.deltaMS;
+    if(boss.basicTimer >= 3500){
+      boss.basicTimer = 0;
+      let bt=null, bd=Infinity;
+      for(const t of troops){ const d=Math.sqrt((t.x-boss.x)**2+(t.y-boss.y)**2); if(d<HEX_SIZE*5 && d<bd){bd=d;bt=t;} }
+      if(bt){
+        const kdx=bt.x-boss.x, kdy=bt.y-boss.y, kd=Math.sqrt(kdx*kdx+kdy*kdy)||1;
+        bt.x += (kdx/kd)*HEX_SIZE*2.5 + (Math.random()-0.5)*14;
+        bt.y += (kdy/kd)*HEX_SIZE*2.5 + (Math.random()-0.5)*14;
+        bt.y = Math.min(bt.y, TROOP_Y_FLOOR);
+        bt.cont.x=bt.x; bt.cont.y=bt.y; bt.atkTimer=0;
+        spawnProjectile(boss.x, boss.y, bt.x, bt.y, 0xffa500, 6);
+        spawnFloat(bt.x, bt.y-16, '击退', 0xffa500);
+      } else {
+        // 无亲兵可击退：直接攻城，迫使纯防守也感受到 BOSS 压迫
+        baseHP = Math.max(0, baseHP - 15);
+        updateHUD(); shake=Math.max(shake,5);
+        spawnProjectile(boss.x, boss.y, cx, cy-20, 0xff4400, 8);
+        spawnFloat(cx, cy-36, '⚔ 攻城 -15', 0xff4400);
+        if(baseHP<=0){ baseHP=0; endGame(); }
+      }
+    }
+    // 技能：每 8s 朝基地方向锥形震地波
+    boss.skillTimer = (boss.skillTimer||0) + app.ticker.deltaMS;
+    if(boss.skillTimer >= 8000 && !bossAoe){
+      boss.skillTimer = 0;
+      bossAoe = { phase:'warn', timer:0, radius:HEX_ROW*2, half:Math.PI/3, cap:4, gfx:new PIXI.Graphics() };
+      projC.addChild(bossAoe.gfx);
+      spawnFloat(boss.x, boss.y-44, '⚠ 曹操·震地锥', 0xffa500);
+      blip(90,0.5,'sawtooth',0.2);
+    }
+  }
+  if(bossAoe){
+    const g=bossAoe.gfx; g.clear();
+    bossAoe.timer += app.ticker.deltaMS;
+    const dirA = Math.PI/2; // 朝下=基地方向
+    if(!boss){ projC.removeChild(g); bossAoe=null; }   // boss已死，清掉残留
+    else if(bossAoe.phase==='warn'){
+      // 蓄力 0.8s：朝基地方向的扇形锥逐渐充能，提示影响范围
+      const p = Math.min(1, bossAoe.timer/800);
+      const a0=dirA-bossAoe.half, a1=dirA+bossAoe.half;
+      g.lineStyle(3, 0xffa500, 0.5+0.4*Math.abs(Math.sin(bossAoe.timer/80)));
+      g.moveTo(boss.x, boss.y); g.arc(boss.x, boss.y, bossAoe.radius, a0, a1); g.lineTo(boss.x, boss.y);
+      g.beginFill(0xffa500, 0.14*p);
+      g.moveTo(boss.x, boss.y); g.arc(boss.x, boss.y, bossAoe.radius*p, a0, a1); g.lineTo(boss.x, boss.y); g.endFill();
+      if(bossAoe.timer >= 800){
+        bossAoe.phase='blast'; bossAoe.timer=0;
+        blip(150,0.4,'square',0.22); shake=Math.max(shake,9);
+        // 爆发：锥内按距离近的优先，最多击退 cap 个亲兵/士兵（不死亡只打断）
+        const inCone = [];
+        for(const t of troops){
+          const dx=t.x-boss.x, dy=t.y-boss.y; const d=Math.sqrt(dx*dx+dy*dy);
+          if(d > bossAoe.radius) continue;
+          let diff=Math.abs(Math.atan2(dy,dx)-dirA); if(diff>Math.PI) diff=2*Math.PI-diff;
+          if(diff <= bossAoe.half) inCone.push({t,d});
+        }
+        inCone.sort((a,b)=>a.d-b.d);
+        for(let k=0;k<Math.min(bossAoe.cap,inCone.length);k++){
+          const t=inCone[k].t;
+          const kdx=t.x-boss.x, kdy=t.y-boss.y, kd=Math.sqrt(kdx*kdx+kdy*kdy)||1;
+          t.x += (kdx/kd)*HEX_SIZE*3 + (Math.random()-0.5)*22;
+          t.y += (kdy/kd)*HEX_SIZE*3 + (Math.random()-0.5)*22;
+          t.y = Math.min(t.y, TROOP_Y_FLOOR);
+          t.cont.x=t.x; t.cont.y=t.y; t.atkTimer=0;
+          spawnFloat(t.x,t.y-16,'⟲击退',0xffa500);
+        }
+      }
+    } else {
+      // 爆发余波 ~0.35s：锥形亮边向外扩散
+      const p = Math.min(1, bossAoe.timer/350);
+      const a0=dirA-bossAoe.half, a1=dirA+bossAoe.half;
+      g.lineStyle(5*(1-p)+1, 0xfff0c0, 0.95*(1-p));
+      g.moveTo(boss.x, boss.y); g.arc(boss.x, boss.y, bossAoe.radius*(0.55+0.7*p), a0, a1); g.lineTo(boss.x, boss.y);
+      if(bossAoe.timer >= 350){ projC.removeChild(g); bossAoe=null; }
+    }
+  }
+
+  // ⑥ 典韦灼烧光环：范围内敌人每秒受 30% 攻击力灼烧
+  for(const cell of hexCells){
+    if(cell.state!=='revealed' || !cell.general || cell.general.key!=='dianwei') continue;
+    const bt=B_TYPES.find(b=>b.key===cell.category);
+    const burnDpsMul = globalBuffs.burnDpsMul_dianwei || 1;
+    const burnDps = bt ? bt.dps * lvlScale(cell.lvl) * cell.general.dpsMul * (globalBuffs.globalDmg||1) * 0.3 * burnDpsMul : 0;
+    const burnPerTick = burnDps * (app.ticker.deltaMS / 1000);
+    const burnRMul = globalBuffs.burnRadiusMul_dianwei || 1;
+    const burnR = HEX_SIZE * 2 * burnRMul;
+    for(let i=enemies.length-1;i>=0;i--){
+      const e=enemies[i];
+      const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2);
+      if(d < burnR){
+        e.hp -= burnPerTick;
+        trackDmg(cell.general.key, cell.general.name, burnPerTick);
+        if(!e._burnVfx || now - e._burnVfx > 500){
+          e._burnVfx = now;
+          spawnFloat(e.x, e.y-8, '🔥', 0xff3300);
+        }
+        if(e.hp<=0){
+          spawnFloat(e.x,e.y-12,'灼杀',0xff3300);
+          // 典韦「燃地」：灼杀的敌人原地留下燃地陷阱
+          if(globalBuffs.fireZone_dianwei){
+            // 燃地格对齐：吸附到最近六边形中心
+            const fzQ=Math.round((e.x-cx)/HEX_COL), fzR=Math.round((e.y-cy)/HEX_ROW-fzQ*0.5);
+            const fzX=HEX_COL*fzQ+cx, fzY=HEX_ROW*(fzR+fzQ*0.5)+cy;
+            const fzGfx=new PIXI.Graphics(); fzGfx.x=fzX; fzGfx.y=fzY; projC.addChild(fzGfx);
+            fireZones.push({ x:fzX, y:fzY, r:HEX_SIZE, life:5000, maxLife:5000, gfx:fzGfx, dps:burnDps*0.4 });
+          }
+          removeEnemy(i);
+        } else { updateEnemyHP(e); }
+      }
+    }
+  }
+
+  // ⑥b 典韦「燃地」陷阱：持续减速+灼烧
+  for(let fi=fireZones.length-1;fi>=0;fi--){
+    const fz=fireZones[fi];
+    fz.life -= app.ticker.deltaMS;
+    if(fz.life <= 0){ projC.removeChild(fz.gfx); fireZones.splice(fi,1); continue; }
+    // 视觉：单格六边形燃地，随时间渐暗
+    const fa = fz.life/fz.maxLife;
+    fz.gfx.clear();
+    fz.gfx.beginFill(0xff3300, fa * 0.35); fz.gfx.drawPolygon(hexCorners(fz.r)); fz.gfx.endFill();
+    fz.gfx.lineStyle(2.5, 0xff6600, Math.min(fa * 1.5, 0.9)); fz.gfx.drawPolygon(hexCorners(fz.r)); fz.gfx.lineStyle(0);
+    // 伤害+减速范围内敌人
+    const fzDmg = fz.dps * (app.ticker.deltaMS/1000);
+    for(let i=enemies.length-1;i>=0;i--){
+      const e=enemies[i];
+      const fd=Math.sqrt((e.x-fz.x)**2+(e.y-fz.y)**2);
+      if(fd<fz.r){
+        e.hp-=fzDmg; e.slowFactor=fz.slowFactor||0.6; e.slowUntil=now+500;
+        if(e.hp<=0){spawnFloat(e.x,e.y-12,'燃地杀',0xff5500);removeEnemy(i);}
+        else{updateEnemyHP(e);}
+      }
+    }
+  }
+
+  // ⑥b2 司马懿·雷暴区：持续伤害
+  for(let si=stormZones.length-1;si>=0;si--){
+    const sz=stormZones[si];
+    sz.life-=app.ticker.deltaMS;
+    if(sz.life<=0){ projC.removeChild(sz.gfx); stormZones.splice(si,1); continue; }
+    const sa=sz.life/sz.maxLife;
+    sz.gfx.clear();
+    sz.gfx.beginFill(0x2244cc,sa*0.28); sz.gfx.drawPolygon(hexPoly(0,0,HEX_SIZE-2)); sz.gfx.endFill();
+    sz.gfx.lineStyle(2,0x88aaff,Math.min(sa*1.4,0.85)); sz.gfx.drawPolygon(hexPoly(0,0,HEX_SIZE-2)); sz.gfx.lineStyle(0);
+    if(sz.expanded){
+      const r1o=[[0,-HEX_ROW],[HEX_COL,-HEX_ROW*0.5],[HEX_COL,HEX_ROW*0.5],[0,HEX_ROW],[-HEX_COL,HEX_ROW*0.5],[-HEX_COL,-HEX_ROW*0.5]];
+      for(const [ox,oy] of r1o){
+        sz.gfx.beginFill(0x1133aa,sa*0.15); sz.gfx.drawPolygon(hexPoly(ox,oy,HEX_SIZE-2)); sz.gfx.endFill();
+        sz.gfx.lineStyle(1,0x66aaff,sa*0.5); sz.gfx.drawPolygon(hexPoly(ox,oy,HEX_SIZE-2)); sz.gfx.lineStyle(0);
+      }
+    }
+    const szDmg=sz.dps*(app.ticker.deltaMS/1000);
+    for(let i=enemies.length-1;i>=0;i--){
+      const e=enemies[i];
+      if(Math.sqrt((e.x-sz.x)**2+(e.y-sz.y)**2)<sz.r){
+        e.hp-=szDmg; trackDmg('simayi','司马懿',szDmg);
+        if(e.hp<=0){spawnFloat(e.x,e.y-12,'⚡',0x88aaff);removeEnemy(i);}else{updateEnemyHP(e);}
+      }
+    }
+  }
+
+  // ⑥c 司马懿·天命雷暴：长间隔攻击，落雷后在目标格留下持续雷暴区
+  for(const cell of hexCells){
+    if(cell.state!=='revealed' || !cell.general || !cell.general.storm){
+      if(cell.stormGfx){ worldC.removeChild(cell.stormGfx); cell.stormGfx=null; }
+      continue;
+    }
+    if(cell.stormGfx){ worldC.removeChild(cell.stormGfx); cell.stormGfx=null; }
+    const bt=B_TYPES.find(b=>b.key===cell.category);
+    if(!bt) continue;
+    // 攻击间隔：大幅拉长，Lv1≈4200ms，Lv4≈2000ms
+    const stormInterval=Math.max(2000,5000-cell.lvl*750);
+    cell._stormTimer=(cell._stormTimer||0)+app.ticker.deltaMS;
+    if(cell._stormTimer>=stormInterval){
+      cell._stormTimer-=stormInterval;
+      const sRange=bt.range*HEX_SIZE*2.2*(cell.general.rangeMul||1)*(globalBuffs.globalRange||1);
+      let stgt=null, sD=Infinity;
+      for(const e of enemies){ const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2); if(d<sRange&&d<sD){sD=d;stgt=e;} }
+      if(!stgt) continue;
+      const sqQ=Math.round((stgt.x-cx)/HEX_COL), sqR2=Math.round((stgt.y-cy)/HEX_ROW-sqQ*0.5);
+      const strikeX=HEX_COL*sqQ+cx, strikeY=HEX_ROW*(sqR2+sqQ*0.5)+cy;
+      const expanded=globalBuffs.stormExpand_simayi;
+      const strikeR=expanded?HEX_ROW:HEX_SIZE;
+      const dmg=bt.dps*lvlScale(cell.lvl)*cell.general.dpsMul*(globalBuffs.globalDmg||1)*0.6;
+      // 落雷瞬间伤害
+      for(let i=enemies.length-1;i>=0;i--){
+        const e=enemies[i];
+        if(Math.sqrt((e.x-strikeX)**2+(e.y-strikeY)**2)<strikeR){
+          e.hp-=dmg; trackDmg('simayi','司马懿',dmg);
+          if(e.hp<=0){spawnFloat(e.x,e.y-12,'⚡天命',0x88aaff);removeEnemy(i);}else{updateEnemyHP(e);}
+        }
+      }
+      if(globalBuffs.stormBolt_simayi&&Math.random()<0.15){
+        const boltDmg=dmg*5; stgt.hp-=boltDmg; trackDmg('simayi','司马懿',boltDmg);
+        spawnFloat(stgt.x,stgt.y-20,'⚡落雷！',0xffee44);
+        spawnProjectile(cell.px,cell.py,stgt.x,stgt.y,0xaaccff,6,6);
+        const bi=enemies.indexOf(stgt); if(bi>=0&&stgt.hp<=0){removeEnemy(bi);}else if(stgt.hp>0){updateEnemyHP(stgt);}
+      }
+      // 移除该格旧的雷暴区（避免叠加）
+      for(let si=stormZones.length-1;si>=0;si--){
+        if(stormZones[si].srcCell===cell){ projC.removeChild(stormZones[si].gfx); stormZones.splice(si,1); }
+      }
+      // 创建持续雷暴区（持续时间=攻击间隔）
+      const szGfx=new PIXI.Graphics(); szGfx.x=strikeX; szGfx.y=strikeY; projC.addChild(szGfx);
+      const zoneDps=dmg/stormInterval*800; // 间隔内总伤≈落雷的0.8倍
+      stormZones.push({ x:strikeX, y:strikeY, r:strikeR, life:stormInterval, maxLife:stormInterval, gfx:szGfx, dps:zoneDps, expanded:expanded, srcCell:cell });
+      // 落雷连接线（快速闪现）
+      const boltL=new PIXI.Graphics(); boltL.lineStyle(2,0x88aaff,0.8); boltL.moveTo(cell.px,cell.py); boltL.lineTo(strikeX,strikeY); projC.addChild(boltL);
+      let bltT=0; const animBlt=()=>{ bltT+=16; boltL.alpha=Math.max(0,1-bltT/300); if(bltT<300) requestAnimationFrame(animBlt); else projC.removeChild(boltL); }; requestAnimationFrame(animBlt);
+    }
+  }
+
+  outerCells: for(const cell of hexCells){
+    if(cell.state!=='revealed') continue;
+    const bt=B_TYPES.find(b=>b.key===cell.category);
+    if(!bt) continue;
+    const gen = cell.general;
+    const isGeneral = cell.lvl >= TUNE.maxLvl && gen;
+    // 司马懿·天命雷暴：在独立循环中处理，跳过标准攻击流程
+    if(gen && gen.storm) continue outerCells;
+    const ck=cell.q+','+cell.r;
+    const cd=attackTimers[ck]||0;
+    const spdMul = (isGeneral ? gen.spdMul : 1) * (globalBuffs.globalAtkSpd || 1);
+    const atkInterval = cell.category==='advance' ? Math.max(3000, 6000 - cell.lvl*1000) : 1100 / ((1 + cell.lvl*0.7) * spdMul);
+    if(now-cd < atkInterval) continue;
+
+    const rangeMul = (isGeneral ? gen.rangeMul : 1) * (globalBuffs.globalRange || 1);
+    let range = bt.range * HEX_SIZE * 2.2 * rangeMul;
+    if(cell.category!=='advance') range = Math.min(range, RANGED_RANGE_CAP);  // B案：远程射程封顶
+    // A案角色分工：远程单体将打最远(后排狙击)，近战/连锁将(庞统周瑜)保持最近(护前线/不破坏连锁)
+    const wantFar = (cell.category!=='advance') && !(isGeneral && gen.chain);
+    let target=null, pickD=wantFar?-Infinity:Infinity, bossT=null, bossD=Infinity;
+    for(const e of enemies){
+      const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2);
+      if(d>=range) continue;
+      if(e.isBoss){ if(d<bossD){ bossD=d; bossT=e; } }      // boss降级为兜底目标
+      else if(wantFar ? d>pickD : d<pickD){ pickD=d; target=e; }
+    }
+    if(!target) target=bossT; // 仅当无小怪可打时才直接打boss
+    // 司马懿「狼顾」：无目标时蓄力累积
+    if(!target && isGeneral && gen && gen.key==='simayi' && globalBuffs.chargeStrike_simayi){
+      attackTimers[ck+'_charge'] = Math.min((attackTimers[ck+'_charge']||1)+0.05*dt, 4);
+    }
+    // ── 进攻格：固定产兵，无敌时集结路口 ──
+    if(cell.category === 'advance'){
+      attackTimers[ck]=now;
+      // Lv4：武将在外时才持续产普通兵，武将复活倒计时中跳过
+      if(isGeneral && !cell.generalOut){ continue outerCells; }
+      if(troops.length<40){
+        const dpsMul=isGeneral?gen.dpsMul:1,dmgMul=globalBuffs.globalDmg||1;
+        const dmg=bt.dps*lvlScale(cell.lvl)*dpsMul*dmgMul;
+        // Lv1→1兵, Lv2→2兵, Lv3→3兵; Lv4：gen.multishot||1（甘宁3路，其他1）
+        const spawnCount = isGeneral ? (gen.multishot||1) : Math.min(cell.lvl, 3);
+        if(target){
+          for(let s=0;s<spawnCount;s++){
+            const tgt=s===0?target:(enemies[Math.floor(Math.random()*enemies.length)]||target);
+            if(!tgt) break; spawnTroop(cell,tgt,dmg);
+          }
+          // 关羽「武圣」：产兵时记录时间戳，用于全军激励叠层
+          if(isGeneral && gen.key==='guanyu' && globalBuffs.presenceBuff_guanyu){
+            if(!globalBuffs._guanyuSpawnTimes) globalBuffs._guanyuSpawnTimes=[];
+            globalBuffs._guanyuSpawnTimes.push(now);
+            globalBuffs._guanyuSpawnTimes=globalBuffs._guanyuSpawnTimes.filter(t2=>now-t2<8000);
+          }
+        } else { spawnRallyTroop(cell,dmg); }
+      }
+      continue outerCells;
+    }
+    if(target){
+      attackTimers[ck]=now;
+      const dpsMul = isGeneral ? gen.dpsMul : 1;
+      const dmgMul = globalBuffs.globalDmg || 1;
+      let dmg = bt.dps * lvlScale(cell.lvl) * dpsMul * dmgMul;
+      const shots = (isGeneral && gen.multishot) ? gen.multishot : 1;
+
+      if(cell.category === 'advance'){
+        // 进攻：出兵
+        if(troops.length>=40) break outerCells;
+        for(let s=0; s<shots; s++){
+          const tgt = s===0 ? target : (enemies[Math.floor(Math.random()*enemies.length)] || target);
+          if(!tgt) break;
+          spawnTroop(cell, tgt, dmg);
+        }
+      } else {
+        // 防守：站桩即时伤害 + 投射物视觉
+        const projColor = isGeneral ? 0xffd24a : bt.hex;
+        const projSize = isGeneral ? gen.projSize : 3;
+
+        // 司马懿「狼顾」蓄力：无目标时累积，命中时消费
+        let simaCharge = 1;
+        if(gen && gen.key==='simayi' && globalBuffs.chargeStrike_simayi){
+          simaCharge = (attackTimers[ck+'_charge'] || 1);
+          attackTimers[ck+'_charge'] = 1;
+          if(simaCharge > 1.5) spawnFloat(cell.px, cell.py-28, '蓄力×'+simaCharge.toFixed(1), 0xddaaff);
+        }
+
+        // 黄忠「落雕散射」：多弹道（gen级即生效）
+        const scatterCount = (gen && gen.key==='huangzhong' && globalBuffs.scatter_huangzhong) ? globalBuffs.scatter_huangzhong : 1;
+        const scatterDmgMul = scatterCount > 1 ? 0.55 : 1;
+
+        // 太史慈「穿云贯日」：穿透弹道（gen级即生效）
+        const pierceCount = (gen && gen.key==='taishici' && globalBuffs.pierce_taishici) ? globalBuffs.pierce_taishici : 0;
+
+        const shotsTotal = Math.max(shots, scatterCount);
+        for(let s=0; s<shotsTotal; s++){
+          let tgt = s===0 ? target : (enemies[Math.floor(Math.random()*enemies.length)] || target);
+          if(!tgt) break;
+
+          let finalDmg = dmg * scatterDmgMul * simaCharge;
+          // 曹仁「镇慑」：被嘲讽敌人攻速-40%（在敌人攻击段处理）
+
+          // 太史慈「鸣镝」：每4发蓄力，第5发伤害×2弹速×3
+          let mingdiMaxLife = 10;
+          if(gen && gen.key==='taishici' && globalBuffs.mingdi_taishici){
+            attackTimers[ck+'_mingdi'] = ((attackTimers[ck+'_mingdi']||0)+1);
+            if(attackTimers[ck+'_mingdi'] >= 5){ attackTimers[ck+'_mingdi']=0; finalDmg*=2; mingdiMaxLife=3; spawnFloat(cell.px,cell.py-28,'鸣镝！',0xffdd44); }
+          }
+
+          // 黄忠「百步穿心」暴击
+          if(gen && gen.key==='huangzhong' && globalBuffs.critChance_huangzhong){
+            if(Math.random() < globalBuffs.critChance_huangzhong){
+              finalDmg *= (globalBuffs.critMul_huangzhong || 3);
+              spawnFloat(tgt.x, tgt.y-18, '暴击！', 0xffd24a);
+            }
+          }
+
+          // 穿透弹道（太史慈）
+          if(pierceCount > 0){
+            const sortedByDist = [...enemies].sort((a,b)=>Math.sqrt((a.x-cell.px)**2+(a.y-cell.py)**2)-Math.sqrt((b.x-cell.px)**2+(b.y-cell.py)**2));
+            let pierceDmg = finalDmg; let hit = 0;
+            for(const pe of sortedByDist){
+              if(hit >= pierceCount+1) break;
+              const pd = Math.sqrt((pe.x-cell.px)**2+(pe.y-cell.py)**2);
+              if(pd > range) break;
+              pe.hp -= pierceDmg;
+              trackDmg(cell.building, gen&&gen.name, pierceDmg);
+              spawnArrowProjectile(cell.px, cell.py, pe.x, pe.y, 0xffdd44, projSize, mingdiMaxLife);
+              spawnFloat(pe.x, pe.y-10, Math.round(pierceDmg)+'', 0xffdd44);
+              pierceDmg *= 0.75; // 穿透递减（每次×0.75）
+              const pi=enemies.indexOf(pe);
+              if(pe.hp<=0&&pi>=0){spawnFloat(pe.x,pe.y-12,'贯穿',0xffdd44);removeEnemy(pi);}else if(pe.hp>0){updateEnemyHP(pe);}
+              hit++;
+            }
+            continue;
+          }
+
+          spawnProjectile(cell.px, cell.py, tgt.x, tgt.y, projColor, projSize, mingdiMaxLife);
+          tgt.hp -= finalDmg;
+          trackDmg(cell.building, gen&&gen.name, finalDmg);
+
+          // 诸葛亮减速+中毒（八阵延伸→目标单元格AOE；否则单体）
+          if(gen && gen.slow){
+            const slowVal = gen.slow;
+            const isZhuge = gen.key==='zhugeliang';
+            const poisonDps = isZhuge ? finalDmg * 0.2 : 0;
+            // 命中处霜冻六边形闪光（cell-locked，让减速/毒有明确落点）
+            if(isZhuge){
+              const fhc=pixelToHexCenter(tgt.x,tgt.y);
+              const frostG=new PIXI.Graphics(); frostG.x=fhc.x; frostG.y=fhc.y; projC.addChild(frostG);
+              frostG.beginFill(0x66ccff,0.30); frostG.drawPolygon(hexCorners(HEX_SIZE-2)); frostG.endFill();
+              frostG.lineStyle(2,0xaaeeff,0.9); frostG.drawPolygon(hexCorners(HEX_SIZE-2));
+              let _ft=0; const _animFrost=()=>{ _ft+=16; frostG.alpha=Math.max(0,1-_ft/280); if(_ft<280) requestAnimationFrame(_animFrost); else if(projC.children.indexOf(frostG)>=0) projC.removeChild(frostG); }; requestAnimationFrame(_animFrost);
+            }
+            if(globalBuffs.slowAoe_zhugeliang && isZhuge){
+              const slowR = HEX_SIZE;
+              for(const se of enemies){
+                const sd = Math.sqrt((se.x-tgt.x)**2+(se.y-tgt.y)**2);
+                if(sd < slowR){ se.slowFactor=slowVal; se.slowUntil=now+2000;
+                  se.poisonUntil=now+2000; se.poisonDps=poisonDps; se._poisonTimer=0; }
+              }
+              spawnFloat(tgt.x, tgt.y-14, '❄☠AOE', 0x88ccff);
+            } else {
+              tgt.slowFactor=slowVal; tgt.slowUntil=now+2000;
+              if(isZhuge){ tgt.poisonUntil=now+2000; tgt.poisonDps=poisonDps; tgt._poisonTimer=0; }
+              spawnFloat(tgt.x, tgt.y-14, isZhuge?'❄☠':'❄', 0x88ccff);
+            }
+          }
+
+          // 许褚击晕 + 军法（击晕传染）
+          if(gen && gen.stun && Math.random()<gen.stun){
+            tgt.stunUntil=now+500;
+            spawnFloat(tgt.x,tgt.y-18,'💫晕',0xffffff);
+            if(globalBuffs.stunSpread_xuchu){
+              const spreadR=HEX_SIZE*2.5;
+              for(const se of enemies){ if(se===tgt) continue;
+                const sd=Math.sqrt((se.x-tgt.x)**2+(se.y-tgt.y)**2);
+                if(sd<spreadR&&Math.random()<0.3){ se.stunUntil=now+1000; spawnFloat(se.x,se.y-14,'💫扩散',0xddddff); }
+              }
+            }
+          }
+
+          // 张飞AOE（霸王怒：半径扩大；火爆：灼烧标记）
+          if(gen && gen.aoe){
+            const aoeRMul = (gen.key==='zhangfei' && globalBuffs.aoeRadiusMul_zhangfei) ? globalBuffs.aoeRadiusMul_zhangfei : 1;
+            const aoeDmg=finalDmg*0.5, aoeR=HEX_SIZE*2*aoeRMul;
+            // AOE爆炸圆圈视觉
+            const _ag=new PIXI.Graphics(); _ag.lineStyle(4,0xff5533,0.9); _ag.drawCircle(0,0,aoeR); _ag.x=tgt.x; _ag.y=tgt.y; projC.addChild(_ag);
+            let _aat=0; const _anim=()=>{ _aat+=18; _ag.scale.set(1+_aat/180); _ag.alpha=Math.max(0,1-_aat/280); if(_aat<280) requestAnimationFrame(_anim); else if(projC.children.indexOf(_ag)>=0) projC.removeChild(_ag); }; requestAnimationFrame(_anim);
+            for(let ai=enemies.length-1;ai>=0;ai--){
+              const ae=enemies[ai]; if(ae===tgt) continue;
+              const ad=Math.sqrt((ae.x-tgt.x)**2+(ae.y-tgt.y)**2);
+              if(ad<aoeR){
+                ae.hp-=aoeDmg; spawnFloat(ae.x,ae.y-10,Math.round(aoeDmg)+'',0xff5a5a);
+                trackDmg(cell.building, gen&&gen.name, aoeDmg);
+                if(globalBuffs.aoeBurn_zhangfei && gen.key==='zhangfei'){
+                  ae.zhangfeiBurnUntil=now+2000; ae._burnDmg=aoeDmg*0.3; ae._burnTimer=0;
+                }
+                if(ae.hp<=0){const aei=enemies.indexOf(ae);if(aei>=0){spawnFloat(ae.x,ae.y-12,'溅杀',0xff5a5a);removeEnemy(aei);}}else{updateEnemyHP(ae);}
+              }
+            }
+          }
+
+          // 庞统·连环雷击：以最近敌人为起点，依次跳到攻击范围内最远的目标
+          if(gen && gen.key==='pangtong' && gen.chain){
+            const chainCount=gen.chain;
+            // tgt 已是最近目标（已命中），从 tgt 出发跳到 range 内最远，依次循环
+            const chainHit=new Set([tgt]);
+            let cSrc=tgt;
+            const chainTargets=[tgt]; // [0]=tgt已伤害，[1+]=后续链式目标
+            for(let step=1;step<chainCount;step++){
+              let farthest=null, farthestD=0;
+              for(const e of enemies){
+                if(chainHit.has(e)) continue;
+                const d=Math.sqrt((e.x-cSrc.x)**2+(e.y-cSrc.y)**2);
+                if(d<=range && d>farthestD){ farthestD=d; farthest=e; }
+              }
+              if(!farthest) break;
+              chainHit.add(farthest); chainTargets.push(farthest); cSrc=farthest;
+            }
+            const cgfx=new PIXI.Graphics(); projC.addChild(cgfx);
+            const flashes=[];
+            let prevSrc={x:cell.px,y:cell.py};
+            for(let hitIdx=0;hitIdx<chainTargets.length;hitIdx++){
+              const cn=chainTargets[hitIdx];
+              const cDmg=finalDmg*Math.pow(gen.chainDecay||0.8,hitIdx);
+              if(hitIdx>0){ cn.hp-=cDmg; trackDmg(cell.building,gen.name,cDmg);
+                const ni=enemies.indexOf(cn);
+                if(cn.hp<=0&&ni>=0){spawnFloat(cn.x,cn.y-12,'⚡连击',0x66ccff);removeEnemy(ni);}else{updateEnemyHP(cn);}
+              }
+              cgfx.lineStyle(1+hitIdx*0.5,0x66ccff,0.85);
+              cgfx.moveTo(prevSrc.x,prevSrc.y); cgfx.lineTo(cn.x,cn.y);
+              if(globalBuffs.boltExplode_pangtong){
+                const hc=pixelToHexCenter(cn.x,cn.y);
+                const fg=new PIXI.Graphics(); fg.x=hc.x; fg.y=hc.y; projC.addChild(fg);
+                fg.beginFill(0x66ccff,0.42); fg.drawPolygon(hexCorners(HEX_SIZE-2)); fg.endFill();
+                fg.lineStyle(2.5,0xaaeeff,0.95); fg.drawPolygon(hexCorners(HEX_SIZE-2));
+                flashes.push(fg);
+                for(let ei=enemies.length-1;ei>=0;ei--){
+                  const ae=enemies[ei]; if(chainHit.has(ae)) continue;
+                  if(sameHexCell(ae.x,ae.y,hc.x,hc.y)){
+                    ae.hp-=cDmg*0.5; trackDmg(cell.building,gen.name,cDmg*0.5);
+                    spawnFloat(ae.x,ae.y-8,Math.round(cDmg*0.5)+'',0x66ccff);
+                    if(ae.hp<=0){const aei=enemies.indexOf(ae);if(aei>=0){spawnFloat(ae.x,ae.y-12,'连爆',0x66ccff);removeEnemy(aei);}}else{updateEnemyHP(ae);}
+                  }
+                }
+              }
+              prevSrc=cn;
+            }
+            let cgT=0; const animCg=()=>{ cgT+=16; const a=Math.max(0,1-cgT/300); cgfx.alpha=a; for(const fg of flashes){fg.alpha=a;} if(cgT<300) requestAnimationFrame(animCg); else{projC.removeChild(cgfx);for(const fg of flashes)projC.removeChild(fg);} }; requestAnimationFrame(animCg);
+          }
+
+          // 连锁攻击（周瑜，排除庞统）
+          if(gen && gen.chain && gen.key!=='pangtong'){
+            let cSrc=tgt, cDmg=finalDmg*(gen.chainDecay||0.6); const hit=new Set([tgt]);
+            for(let c=0;c<gen.chain;c++){
+              let cn=null, cnd=Infinity;
+              for(const ce of enemies){if(hit.has(ce))continue;const cd=Math.sqrt((ce.x-cSrc.x)**2+(ce.y-cSrc.y)**2);if(cd<cnd){cnd=cd;cn=ce;}}
+              if(!cn) break; hit.add(cn); cn.hp-=cDmg;
+              trackDmg(cell.building, gen&&gen.name, cDmg);
+              const chainClr=gen.chainColor||0xff6a00;
+              spawnProjectile(cSrc.x,cSrc.y,cn.x,cn.y,chainClr,4);
+              spawnFloat(cn.x,cn.y-10,Math.round(cDmg)+'',chainClr);
+              const ni=enemies.indexOf(cn);
+              if(cn.hp<=0&&ni>=0){spawnFloat(cn.x,cn.y-12,'连锁',chainClr);removeEnemy(ni);}else if(cn.hp>0){updateEnemyHP(cn);}
+              cSrc=cn; cDmg*=(gen.chainDecay||0.6);
+            }
+            // 周瑜「子弹道」：命中主目标后分裂2条
+            if(globalBuffs.splitProj_zhouyu && gen.key==='zhouyu'){
+              const splitTargets = enemies.filter(e=>e!==tgt).sort(()=>Math.random()-0.5).slice(0,2);
+              for(const st of splitTargets){
+                st.hp -= finalDmg*0.5;
+                trackDmg(cell.building, gen&&gen.name, finalDmg*0.5);
+                spawnProjectile(tgt.x, tgt.y, st.x, st.y, 0xff9900, 3);
+                spawnFloat(st.x, st.y-8, Math.round(finalDmg*0.5)+'', 0xff9900);
+                const si=enemies.indexOf(st);
+                if(st.hp<=0&&si>=0){spawnFloat(st.x,st.y-12,'分裂杀',0xff9900);removeEnemy(si);}else if(st.hp>0){updateEnemyHP(st);}
+              }
+            }
+          }
+
+          if(tgt.hp<=0){
+            const idx=enemies.indexOf(tgt);
+            if(idx>=0){spawnFloat(tgt.x,tgt.y-12,gen?gen.name+'击破':'击破',0xffd24a);removeEnemy(idx);}
+          } else { updateEnemyHP(tgt); }
+        }
+      }
+    }
+  }
+
+  // ⑦ 少年基地普攻（随等级提升范围/伤害）
+  if(shaoNianAtk && enemies.length > 0 && !gameOver){
+    const baseCell = hexCells.find(c=>c.state==='base');
+    if(baseCell){
+      shaoNianAtk.timer += app.ticker.deltaMS;
+      const atkInterval = 1500 * shaoNianAtk.spdMul;
+      if(shaoNianAtk.timer >= atkInterval){
+        shaoNianAtk.timer = 0;
+        const range = HEX_SIZE * (3.5 + baseLvl * 0.5) * shaoNianAtk.rangeMul;
+        const dmg = (4 + baseLvl * 3) * shaoNianAtk.dmgMul;
+        const inRange = enemies.filter(e2=>Math.sqrt((e2.x-baseCell.px)**2+(e2.y-baseCell.py)**2)<range);
+        inRange.sort((a2,b2)=>Math.sqrt((a2.x-baseCell.px)**2+(a2.y-baseCell.py)**2)-Math.sqrt((b2.x-baseCell.px)**2+(b2.y-baseCell.py)**2));
+        let hitCount=0;
+        for(const st of inRange){
+          if(hitCount >= shaoNianAtk.targets) break;
+          st.hp -= dmg;
+          trackDmg('shaonian','少年',dmg);
+          spawnProjectile(baseCell.px, baseCell.py, st.x, st.y, 0xffd24a, 3);
+          const sei=enemies.indexOf(st);
+          if(st.hp<=0&&sei>=0){spawnFloat(st.x,st.y-14,'少年击破',0xffd24a);removeEnemy(sei);}
+          else if(st.hp>0){updateEnemyHP(st);}
+          hitCount++;
+        }
+      }
+    }
+  }
+
+  // ⑧ Lv4进攻将领冠军出征
+  for(const cell of hexCells){
+    if(cell.state!=='revealed' || cell.category!=='advance' || cell.lvl < TUNE.maxLvl) continue;
+    const gen=cell.general; if(!gen) continue;
+    if(cell.generalRespawnTimer > 0){
+      cell.generalRespawnTimer -= app.ticker.deltaMS;
+      if(cell.generalRespawnTimer < 0) cell.generalRespawnTimer = 0;
+      // 弧线倒计时显示
+      if(!cell.timerArc){
+        cell.timerArc=new PIXI.Graphics();
+        cell.timerText=new PIXI.Text('',{fontSize:9,fill:'#ffd24a',fontWeight:'800'});
+        cell.timerText.anchor.set(0.5);
+        cell.cont.addChild(cell.timerArc); cell.cont.addChild(cell.timerText);
+      }
+      const pct=cell.generalRespawnTimer/5000;
+      cell.timerArc.clear();
+      cell.timerArc.lineStyle(3,0xffd24a,0.75);
+      cell.timerArc.arc(0,0,HEX_SIZE-5,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);
+      cell.timerText.text=Math.ceil(cell.generalRespawnTimer/1000)+'s';
+    } else if(cell.timerArc){
+      cell.cont.removeChild(cell.timerArc); cell.timerArc=null;
+      if(cell.timerText){ cell.cont.removeChild(cell.timerText); cell.timerText=null; }
+    }
+    if(!cell.generalOut && cell.generalRespawnTimer <= 0){
+      if(cell.timerArc){ cell.cont.removeChild(cell.timerArc); cell.timerArc=null; }
+      if(cell.timerText){ cell.cont.removeChild(cell.timerText); cell.timerText=null; }
+      cell.generalOut = true;
+      const bt=B_TYPES.find(b=>b.key===cell.category);
+      const dpsMul = gen.dpsMul;
+      const dmg = bt.dps * lvlScale(cell.lvl) * dpsMul * (globalBuffs.globalDmg||1);
+      let tgt=null, minD=Infinity, btg=null, btd=Infinity;
+      for(const e of enemies){ const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2); if(e.isBoss){ if(d<btd){btd=d;btg=e;} } else if(d<minD){minD=d;tgt=e;} }
+      if(!tgt) tgt=btg; // boss兜底
+      if(tgt) spawnGeneralTroop(cell, tgt, dmg);
+      else spawnRallyTroop(cell, dmg);
+    }
+  }
+
+  for(let i=troops.length-1;i>=0;i--){
+    const t=troops[i];
+    // 曹仁嘲讽范围可视化（六边形格高亮，仅当范围内有敌时显示=触发式）
+    if(t.srcName==='曹仁'){
+      if(!t._tauntGfx){ t._tauntGfx=new PIXI.Graphics(); t.cont.addChildAt(t._tauntGfx,0); }
+      const N = (t.gen && t.gen.key==='caoren' && globalBuffs.tauntRangeMul_caoren) ? 2 : 1; // 扩范围仅本体生效
+      let anyInRange=false;
+      for(const e of enemies){ if(hexDistance(t.x,t.y,e.x,e.y)<=N){ anyInRange=true; break; } }
+      t._tauntGfx.clear();
+      if(anyInRange){
+        const cur=pixelToAxial(t.x,t.y);
+        for(let dq=-N; dq<=N; dq++){
+          for(let dr=Math.max(-N,-dq-N); dr<=Math.min(N,-dq+N); dr++){
+            const p=hexToPixel(cur.q+dq, cur.r+dr, cx, cy);
+            const lx=p.x-t.x, ly=p.y-t.y;
+            t._tauntGfx.beginFill(0xffaa44,0.10); t._tauntGfx.drawPolygon(hexPoly(lx,ly,HEX_SIZE-3)); t._tauntGfx.endFill();
+            t._tauntGfx.lineStyle(1.5,0xffaa44,0.55); t._tauntGfx.drawPolygon(hexPoly(lx,ly,HEX_SIZE-3)); t._tauntGfx.lineStyle(0);
+          }
+        }
+      }
+    }
+    // 集结模式：向集结点前进，三圈内有敌再出击
+    if(t.rallying){
+      if(enemies.length>0){
+        const alertR = HEX_SIZE * 6; // 3圈警戒半径
+        if(enemies.some(e=>Math.sqrt((e.x-t.x)**2+(e.y-t.y)**2)<alertR)) t.rallying=false;
+      }
+      else {
+        const rdx=t.rallyX-t.x, rdy=t.rallyY-t.y;
+        const rdist=Math.sqrt(rdx*rdx+rdy*rdy);
+        if(rdist>5){
+          t.x+=rdx/rdist*0.25*dt; t.y+=rdy/rdist*0.25*dt;
+          if(t.y < LANE_MERGE_Y - HEX_ROW * 2){
+            const obsBuf=HEX_SIZE+4;
+            if(t.laneIdx===0)      t.x=Math.min(t.x,LANE_BOUNDS[0]-obsBuf);
+            else if(t.laneIdx===2) t.x=Math.max(t.x,LANE_BOUNDS[1]+obsBuf);
+            else t.x=Math.max(LANE_BOUNDS[0]+obsBuf,Math.min(t.x,LANE_BOUNDS[1]-obsBuf));
+          }
+          t.cont.x=t.x; t.cont.y=t.y;
+        }
+        continue;
+      }
+    }
+    if(!enemies.length){
+      if(t.isGeneralTroop&&t.sourceCell){ t.sourceCell.generalOut=false; t.sourceCell.generalRespawnTimer=0; }
+      removeTroop(i); continue;
+    }
+    let nearest=null, nd=Infinity;
+    for(const e of enemies){ const d=Math.sqrt((e.x-t.x)**2+(e.y-t.y)**2); if(d<nd){nd=d;nearest=e;} }
+    if(!nearest){ removeTroop(i); continue; }
+    const tdx=nearest.x-t.x, tdy=nearest.y-t.y;
+    const tdist=Math.sqrt(tdx*tdx+tdy*tdy);
+
+    // 关羽·剑气波：亲兵不贴脸——3格内蓄力+逼近，2格内蓄满即放穿透剑气波（不吃melee反伤）
+    if(t.gen && t.gen.key==='guanyu'){
+      const hd=hexDistance(t.x,t.y,nearest.x,nearest.y);
+      const gMov=(t.moveSpdMul||1)*(t.bt&&t.bt.troopSpd||0.25);
+      const CHARGE_MS=1000;          // 蓄力时长（可调）
+      const obsClamp=()=>{ if(t.y < LANE_MERGE_Y - HEX_ROW*2){ const ob=HEX_SIZE+4;
+        if(t.laneIdx===0) t.x=Math.min(t.x,LANE_BOUNDS[0]-ob);
+        else if(t.laneIdx===2) t.x=Math.max(t.x,LANE_BOUNDS[1]+ob);
+        else t.x=Math.max(LANE_BOUNDS[0]+ob,Math.min(t.x,LANE_BOUNDS[1]-ob)); } };
+      if(hd>3){
+        // 远：清空蓄力，沿格快速推进找怪
+        t._charge=0; if(t._chargeGfx) t._chargeGfx.visible=false;
+        const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
+        const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
+        t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
+      } else {
+        // 3格内：开始蓄力
+        t._charge=(t._charge||0)+app.ticker.deltaMS;
+        if(!t._chargeGfx){ t._chargeGfx=new PIXI.Graphics(); t.cont.addChild(t._chargeGfx); }
+        t._chargeGfx.visible=true;
+        const cp=Math.min(1,t._charge/CHARGE_MS);
+        t._chargeGfx.clear(); t._chargeGfx.lineStyle(2,0x66ddff,0.4+0.55*cp); t._chargeGfx.drawCircle(0,0,t.size+4+cp*7);
+        if(cp>=1){ t._chargeGfx.beginFill(0xaaffff,0.22); t._chargeGfx.drawCircle(0,0,t.size+2); t._chargeGfx.endFill(); }
+        if(hd>2){
+          // 2~3格：边蓄力边慢速逼近到放波距离
+          const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
+          const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
+          t.x+=wdx/wl*gMov*0.6*dt; t.y+=wdy/wl*gMov*0.6*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
+        } else if(t._charge>=CHARGE_MS){
+          // ≤2格且蓄满：释放剑气波
+          t._charge=0; t._chargeGfx.visible=false;
+          const tnow=performance.now();
+          const guanyuBonus=globalBuffs.presenceBuff_guanyu ? 1+Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
+          fireGuanyuWave(t, nearest, t.dmg*guanyuBonus*3.0);    // 蓄力穿透爆发×3.0（可调）
+        }
+      }
+      continue;
+    }
+
+    // 亲兵移速：gen.spdMul 接入（赵云2.0→实际跑速翻倍；太史慈buff叠加）
+    const baseMovSpd = t.moveSpdMul || 1;
+    const troopSpdMul = baseMovSpd * ((t.gen && t.gen.key==='taishici' && globalBuffs.troopSpd_taishici) ? globalBuffs.troopSpd_taishici : 1);
+    // 赵云「七进七出」：亲兵攻速×1.5 → 攻击间隔缩短
+    const troopAtkInterval = (t.gen && t.gen.key==='zhaoyun' && globalBuffs.troopAtkSpd_zhaoyun) ? Math.round(400/globalBuffs.troopAtkSpd_zhaoyun) : 400;
+
+    if(tdist>14){
+      const _twp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
+      const _wdx=_twp.x-t.x, _wdy=_twp.y-t.y, _wl=Math.hypot(_wdx,_wdy)||1;
+      const tBaseSpd=t.bt&&t.bt.troopSpd||0.25; t.x+=_wdx/_wl*tBaseSpd*troopSpdMul*dt; t.y+=_wdy/_wl*tBaseSpd*troopSpdMul*dt;
+      t.cont.x=t.x; t.cont.y=t.y;
+      // 障碍带限位：仅在视觉障碍格存在的Y范围内限位（匹配视觉与碰撞）
+      if(t.y < LANE_MERGE_Y - HEX_ROW * 2){
+        const obsBuf=HEX_SIZE+4;
+        if(t.laneIdx===0)      t.x=Math.min(t.x, LANE_BOUNDS[0]-obsBuf);
+        else if(t.laneIdx===2) t.x=Math.max(t.x, LANE_BOUNDS[1]+obsBuf);
+        else t.x=Math.max(LANE_BOUNDS[0]+obsBuf, Math.min(t.x, LANE_BOUNDS[1]-obsBuf));
+        t.cont.x=t.x;
+      }
+    } else {
+      t.atkTimer+=app.ticker.deltaMS;
+      if(t.atkTimer>=troopAtkInterval){
+        t.atkTimer=0;
+        const tnow=performance.now();
+
+        // 赵云「龙胆」：每3击×2伤害
+        t._hitCount = (t._hitCount||0)+1;
+        const dragonLance = (t.gen && t.gen.key==='zhaoyun' && globalBuffs.tripleStrike_zhaoyun && t._hitCount%3===0);
+        // 关羽「武圣」：8秒内产兵批次×8%全军增伤（最多3层）
+        const guanyuBonus = globalBuffs.presenceBuff_guanyu ? 1 + Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
+        const troopDmg = (dragonLance ? t.dmg*2 : t.dmg) * guanyuBonus;
+        if(dragonLance) spawnFloat(nearest.x, nearest.y-20, '龙胆！', 0x44ddff);
+
+        nearest.hp -= troopDmg;
+        trackDmg(t.srcKey, t.srcName, troopDmg);
+        // 近战攻击后吸引仇恨：受击敌人转向该亲兵2.5秒
+        nearest.aggroTroop=t; nearest.aggroUntil=tnow+2500;
+        if(t.gen && t.gen.key==='guanyu' && globalBuffs.troopSplash_guanyu){
+          const splashR = HEX_SIZE*1.8;
+          for(let j=enemies.length-1;j>=0;j--){
+            const ae=enemies[j]; if(ae===nearest) continue;
+            const sd=Math.sqrt((ae.x-nearest.x)**2+(ae.y-nearest.y)**2);
+            if(sd<splashR){
+              ae.hp-=troopDmg*0.5; spawnFloat(ae.x,ae.y-8,Math.round(troopDmg*0.5)+'',0xff8844);
+              trackDmg(t.srcKey, t.srcName, troopDmg*0.5);
+              if(ae.hp<=0){spawnFloat(ae.x,ae.y-12,'义绝',0xff8844);removeEnemy(j);}else{updateEnemyHP(ae);}
+            }
+          }
+        }
+
+        if(t.gen){
+          if(t.gen.slow){ nearest.slowFactor=t.gen.slow; nearest.slowUntil=tnow+2000; }
+          if(t.gen.stun && Math.random()<(t.gen.stun||0.3)){
+            const stunDur = 500;
+            nearest.stunUntil=tnow+stunDur;
+            spawnFloat(nearest.x,nearest.y-18,'💫晕',0xffffff);
+            if(globalBuffs.stunSpread_xuchu){
+              const spreadR=HEX_SIZE*2.5;
+              for(const se of enemies){ if(se===nearest) continue;
+                const sd=Math.sqrt((se.x-nearest.x)**2+(se.y-nearest.y)**2);
+                if(sd<spreadR&&Math.random()<0.3){ se.stunUntil=tnow+1000; spawnFloat(se.x,se.y-14,'💫扩散',0xddddff); }
+              }
+            }
+          }
+          if(t.gen.aoe){
+            const aoeRMul=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?globalBuffs.aoeRadiusMul_zhangfei:1;
+            const aoeDmg=troopDmg*0.5;
+            const aoeR=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?HEX_ROW*2:HEX_ROW*1.5;
+            // 前方扇形：以自身格为圆心，朝攻击目标方向±60°两圈范围溅射
+            const fwdA=Math.atan2(nearest.y-t.y, nearest.x-t.x);
+            for(let j=enemies.length-1;j>=0;j--){
+              const ae=enemies[j]; if(ae===nearest) continue;
+              const dx2=ae.x-t.x, dy2=ae.y-t.y;
+              const ad=Math.sqrt(dx2*dx2+dy2*dy2);
+              if(ad>=aoeR) continue;
+              let angDiff=Math.abs(Math.atan2(dy2,dx2)-fwdA); if(angDiff>Math.PI) angDiff=2*Math.PI-angDiff;
+              if(angDiff>Math.PI/3) continue;
+              ae.hp-=aoeDmg; spawnFloat(ae.x,ae.y-10,Math.round(aoeDmg)+'',0xff5a5a);
+              trackDmg(t.srcKey, t.srcName, aoeDmg);
+              if(globalBuffs.aoeBurn_zhangfei&&t.gen.key==='zhangfei'){
+                ae.zhangfeiBurnUntil=tnow+2000; ae._burnDmg=aoeDmg*0.3; ae._burnTimer=0;
+              }
+              if(ae.hp<=0){spawnFloat(ae.x,ae.y-12,'溅杀',0xff5a5a);removeEnemy(j);}else{updateEnemyHP(ae);}
+            }
+          }
+          if(t.gen.chain){
+            let cSrc=nearest, cDmg=troopDmg*0.6; const hit=new Set([nearest]);
+            for(let c=0;c<t.gen.chain;c++){
+              let cn=null, cnd=Infinity;
+              for(const ce of enemies){ if(hit.has(ce))continue; const cd=Math.sqrt((ce.x-cSrc.x)**2+(ce.y-cSrc.y)**2); if(cd<cnd){cnd=cd;cn=ce;} }
+              if(!cn) break; hit.add(cn); cn.hp-=cDmg;
+              trackDmg(t.srcKey, t.srcName, cDmg);
+              spawnFloat(cn.x,cn.y-10,Math.round(cDmg)+'',0xff6a00);
+              const ni=enemies.indexOf(cn);
+              if(cn.hp<=0&&ni>=0){spawnFloat(cn.x,cn.y-12,'连锁',0xff6a00);removeEnemy(ni);}else if(cn.hp>0){updateEnemyHP(cn);}
+              cSrc=cn; cDmg*=0.6;
+            }
+          }
+        } // end if(t.gen)
+        // 吕布铁骑冲阵：所有等级均有（charge标志在spawnTroop时写入），Lv4武将版伤更高
+        if((t.gen && t.gen.charge) || t.charge){
+            const chgDx=nearest.x-t.x, chgDy=nearest.y-t.y;
+            const chgLen=Math.sqrt(chgDx*chgDx+chgDy*chgDy)||1;
+            const chgNX=chgDx/chgLen, chgNY=chgDy/chgLen;
+            const pierceW=HEX_SIZE*(globalBuffs.chargeWidthMul_lubu||1);
+            const pierceDmg=troopDmg*0.6*(globalBuffs.chargeDmgMul_lubu||1);
+            // 冲阵光迹：中轴 + 两侧余韵
+            const chgGfx=new PIXI.Graphics(); projC.addChild(chgGfx);
+            chgGfx.lineStyle(3,0xff6633,0.95);
+            chgGfx.moveTo(t.x-chgNX*HEX_SIZE,t.y-chgNY*HEX_SIZE);
+            chgGfx.lineTo(t.x+chgNX*(chgLen+HEX_SIZE*2),t.y+chgNY*(chgLen+HEX_SIZE*2));
+            chgGfx.lineStyle(1.5,0xffaa66,0.5);
+            chgGfx.moveTo(t.x-chgNX*HEX_SIZE+chgNY*7,t.y-chgNY*HEX_SIZE-chgNX*7);
+            chgGfx.lineTo(t.x+chgNX*(chgLen+HEX_SIZE)+chgNY*7,t.y+chgNY*(chgLen+HEX_SIZE)-chgNX*7);
+            chgGfx.moveTo(t.x-chgNX*HEX_SIZE-chgNY*7,t.y-chgNY*HEX_SIZE+chgNX*7);
+            chgGfx.lineTo(t.x+chgNX*(chgLen+HEX_SIZE)-chgNY*7,t.y+chgNY*(chgLen+HEX_SIZE)+chgNX*7);
+            let chgT=0; const animChg=()=>{ chgT+=16; chgGfx.alpha=Math.max(0,1-chgT/220); if(chgT<220) requestAnimationFrame(animChg); else projC.removeChild(chgGfx); }; requestAnimationFrame(animChg);
+            for(let j=enemies.length-1;j>=0;j--){
+              const pe=enemies[j]; if(pe===nearest) continue;
+              const ex=pe.x-t.x, ey=pe.y-t.y;
+              const cross=Math.abs(ex*(chgDy/chgLen)-ey*(chgDx/chgLen));
+              const dot=ex*(chgDx/chgLen)+ey*(chgDy/chgLen);
+              if(cross<pierceW && dot>0 && dot<chgLen+HEX_SIZE*2){
+                pe.hp-=pierceDmg; spawnFloat(pe.x,pe.y-10,Math.round(pierceDmg)+'',0xff6633);
+                trackDmg(t.srcKey,t.srcName,pierceDmg);
+                if(globalBuffs.chargeKnockback_lubu){
+                  pe.x+=chgNX*HEX_SIZE*0.8; pe.y+=chgNY*HEX_SIZE*0.8;
+                  if(pe.cont){ pe.cont.x=pe.x; pe.cont.y=pe.y; }
+                }
+                // 穿透命中：点亮所在六边形单元格
+                const hc=pixelToHexCenter(pe.x,pe.y);
+                const impG=new PIXI.Graphics(); impG.x=hc.x; impG.y=hc.y; projC.addChild(impG);
+                impG.beginFill(0xff6633,0.28); impG.drawPolygon(hexCorners(HEX_SIZE-2)); impG.endFill();
+                impG.lineStyle(2.5,0xff8844,0.95); impG.drawPolygon(hexCorners(HEX_SIZE-2));
+                let _impT=0; const _animImp=()=>{ _impT+=16; impG.alpha=Math.max(0,1-_impT/240); if(_impT<240) requestAnimationFrame(_animImp); else if(projC.children.indexOf(impG)>=0) projC.removeChild(impG); }; requestAnimationFrame(_animImp);
+                if(pe.hp<=0){spawnFloat(pe.x,pe.y-12,'冲阵',0xff8800);removeEnemy(j);}else{updateEnemyHP(pe);}
+              }
+            }
+          }
+        const nei=enemies.indexOf(nearest);
+        if(nearest.hp<=0){
+          if(nei>=0){spawnFloat(nearest.x,nearest.y-12,t.gen?'★'+t.gen.name:'击破',0xffd24a);removeEnemy(nei);}
+          // 甘宁「奇袭」：击杀后对最近另一目标造成50%伤害
+          if(globalBuffs.ganningChain && t.gen && t.gen.key==='ganning' && enemies.length>0){
+            let chainTgt=null, chainD=Infinity;
+            for(const ce of enemies){ const cd=Math.sqrt((ce.x-t.x)**2+(ce.y-t.y)**2); if(cd<chainD){chainD=cd;chainTgt=ce;} }
+            if(chainTgt){ chainTgt.hp-=troopDmg*0.5; spawnFloat(chainTgt.x,chainTgt.y-14,'奇袭！',0xffaa00);
+              const ci=enemies.indexOf(chainTgt); if(chainTgt.hp<=0&&ci>=0){removeEnemy(ci);}else if(chainTgt.hp>0){updateEnemyHP(chainTgt);} }
+          }
+        } else {
+          updateEnemyHP(nearest);
+          t.hp-=nearest.maxHp*0.06; updateTroopHP(t);
+          // 曹仁反伤：亲兵受近战攻击时反弹伤害给攻击者
+          if(t.reflect > 0 && !nearest.isBoss){
+            const rfDmg = Math.ceil(nearest.maxHp * 0.06 * t.reflect);
+            nearest.hp -= rfDmg;
+            spawnFloat(nearest.x, nearest.y-8, '↩'+rfDmg, 0xffaa44);
+            const rfi=enemies.indexOf(nearest);
+            if(nearest.hp<=0 && rfi>=0){ spawnFloat(nearest.x,nearest.y-12,'反伤击杀',0xffaa44); removeEnemy(rfi); }
+            else if(nearest.hp>0) updateEnemyHP(nearest);
+          }
+          if(t.hp<=0){
+            // 典韦亲兵阵亡：在原格留下火海（殉燃词条可强化）
+            if(t.gen && t.gen.key==='dianwei'){
+              const burnDps=(B_TYPES.find(b=>b.key==='advance')||{dps:6}).dps*3;
+              const fzQ=Math.round((t.x-cx)/HEX_COL), fzR2=Math.round((t.y-cy)/HEX_ROW-fzQ*0.5);
+              const fzX=HEX_COL*fzQ+cx, fzY=HEX_ROW*(fzR2+fzQ*0.5)+cy;
+              const fzLife = globalBuffs.deathFireBoost_dianwei ? 10000 : 5000;
+              const fzSlow = globalBuffs.deathFireBoost_dianwei ? 0.4 : 0.6;
+              const fzGfx=new PIXI.Graphics(); fzGfx.x=fzX; fzGfx.y=fzY; projC.addChild(fzGfx);
+              fireZones.push({ x:fzX, y:fzY, r:HEX_SIZE, life:fzLife, maxLife:fzLife, gfx:fzGfx, dps:burnDps*0.4, slowFactor:fzSlow });
+            }
+            if(t.isGeneralTroop){
+              t.sourceCell.generalOut=false;
+              t.sourceCell.generalRespawnTimer=5000;
+              spawnFloat(t.x,t.y-14,'战死！',0xffd24a);
+            } else {
+              spawnFloat(t.x,t.y-10,'阵亡',0xff5a5a);
+            }
+            removeTroop(i); continue;
+          }
+        }
+      }
+    }
+  }
+
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p=projectiles[i]; p.life--;
+    const t2=1-p.life/p.maxLife;
+    p.cont.x=p.sx+(p.tx-p.sx)*t2; p.cont.y=p.sy+(p.ty-p.sy)*t2;
+    p.cont.alpha=1-t2*0.6;
+    if(p.fixedRotation!==undefined) p.cont.rotation=p.fixedRotation;
+    if(p.life<=0){ projC.removeChild(p.cont); projectiles.splice(i,1); }
+  }
+
+  for(let i=floats.length-1;i>=0;i--){
+    const f=floats[i]; f.y-=0.6; f.life--; f.alpha=Math.min(1,f.life/Math.min(16,(f._maxLife||30)*0.4));
+    if(f.life<=0){ floatC.removeChild(f); floats.splice(i,1); }
+  }
+
+  // 引导脉冲动画
+  if(guideStep < 2){
+    const pa=0.3+0.3*Math.sin(performance.now()/700);
+    for(const c of hexCells){
+      const isPulse=(guideStep===0 && c.state==='flippable')||
+        (guideStep===1 && c.state==='revealed' && c.lvl<TUNE.maxLvl &&
+          hexCells.some(o=>o!==c&&o.state==='revealed'&&o.lvl===c.lvl&&o.building===c.building&&o.lvl<TUNE.maxLvl));
+      if(isPulse){
+        if(!c.guidePulse){ c.guidePulse=new PIXI.Graphics(); c.cont.addChild(c.guidePulse); }
+        c.guidePulse.clear();
+        c.guidePulse.lineStyle(2.5,guideStep===0?0x4affff:0xffcc00,pa);
+        c.guidePulse.drawPolygon(hexCorners(HEX_SIZE+4));
+      } else if(c.guidePulse){ c.cont.removeChild(c.guidePulse); c.guidePulse=null; }
+    }
+  }
+}
+
+function spawnTroop(cell, initialTarget, dmg){
+  const bt=B_TYPES.find(b=>b.key===cell.category);
+  const gen=cell.general; const isGen=cell.lvl>=TUNE.maxLvl&&gen;
+  const dpsMul=isGen?gen.dpsMul:1;
+  const hp=bt.dps*lvlScale(cell.lvl)*dpsMul*2.5;
+  const size=isGen?(gen.projSize||6):5;
+  // 从城外生成，不在建筑格内出现
+  const laneIdx=cell.px < LANE_BOUNDS[0] ? 0 : (cell.px > LANE_BOUNDS[1] ? 2 : 1);
+  const spawnX=LANES[laneIdx]+(Math.random()-0.5)*18;
+  const spawnY=TROOP_Y_FLOOR - HEX_SIZE*0.5;
+  const cont=new PIXI.Container();
+  const body=new PIXI.Graphics(); body.beginFill(isGen?0xffd24a:bt.hex); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-size-6,16,3); hpBg.endFill(); cont.addChild(hpBg);
+  const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
+  cont.x=spawnX; cont.y=spawnY; projC.addChild(cont);
+  const moveSpdMul = cell.general ? (cell.general.spdMul || 1) : 1;
+  const troopReflect = cell.general ? (cell.general.reflect || 0) : 0;
+  const troop={x:spawnX,y:spawnY,homeX:spawnX,homeY:spawnY,hp,maxHp:hp,dmg,cont,hpFill,size,gen:isGen?gen:null,bt,atkTimer:0,charge:!!(cell.general&&cell.general.charge),srcKey:cell.building,srcName:cell.general?cell.general.name:cell.building,moveSpdMul,reflect:troopReflect,laneIdx};
+  updateTroopHP(troop); troops.push(troop);
+}
+
+function updateTroopHP(t){
+  const pct=Math.max(0,t.hp/t.maxHp);
+  t.hpFill.clear(); t.hpFill.beginFill(0x44ff88); t.hpFill.drawRect(-8,-t.size-6,16*pct,3); t.hpFill.endFill();
+}
+
+function removeTroop(idx){ projC.removeChild(troops[idx].cont); troops.splice(idx,1); }
+
+// 关羽·青龙斩：沿六边形六方向之一(朝目标)格对齐穿透3格（义绝→5格），逐格命中
+function fireGuanyuWave(t, target, dmg){
+  const cur=pixelToAxial(t.x,t.y);
+  const gdx=target.x-t.x, gdy=target.y-t.y, gl=Math.hypot(gdx,gdy)||1;
+  // 选最朝目标的六方向
+  let bestDir=HEX_DIRS[0], bestScore=-Infinity;
+  for(const [dq,dr] of HEX_DIRS){
+    const np=hexToPixel(cur.q+dq,cur.r+dr,cx,cy);
+    const ndx=np.x-t.x, ndy=np.y-t.y, nl=Math.hypot(ndx,ndy)||1;
+    const s=(ndx*gdx+ndy*gdy)/(nl*gl);
+    if(s>bestScore){ bestScore=s; bestDir=[dq,dr]; }
+  }
+  const pierceLen=globalBuffs.troopSplash_guanyu?5:3;   // 义绝→穿透更远
+  const startC=hexToPixel(cur.q,cur.r,cx,cy);
+  const cells=[]; for(let k=1;k<=pierceLen;k++) cells.push(hexToPixel(cur.q+bestDir[0]*k, cur.r+bestDir[1]*k, cx, cy));
+  const last=cells[cells.length-1];
+  const flashes=[];
+  // 刀光主线
+  const wg=new PIXI.Graphics(); projC.addChild(wg); flashes.push(wg);
+  wg.lineStyle(7,0x88eeff,0.95); wg.moveTo(startC.x,startC.y); wg.lineTo(last.x,last.y);
+  wg.lineStyle(3,0xffffff,0.95); wg.moveTo(startC.x,startC.y); wg.lineTo(last.x,last.y);
+  // 逐格高亮 + 命中该格内所有敌人
+  for(const c of cells){
+    const cg=new PIXI.Graphics(); cg.x=c.x; cg.y=c.y; projC.addChild(cg); flashes.push(cg);
+    cg.beginFill(0x88eeff,0.30); cg.drawPolygon(hexCorners(HEX_SIZE-2)); cg.endFill();
+    cg.lineStyle(2.5,0xcceeff,0.95); cg.drawPolygon(hexCorners(HEX_SIZE-2));
+    for(let j=enemies.length-1;j>=0;j--){
+      const pe=enemies[j];
+      if(sameHexCell(pe.x,pe.y,c.x,c.y)){
+        pe.hp-=dmg; trackDmg(t.srcKey,t.srcName,dmg);
+        spawnFloat(pe.x,pe.y-10,Math.round(dmg)+'',0x88eeff);
+        if(pe.hp<=0){spawnFloat(pe.x,pe.y-12,'青龙斩',0x88eeff);removeEnemy(j);}else updateEnemyHP(pe);
+      }
+    }
+  }
+  // 释放闪光
+  const flash=new PIXI.Graphics(); flash.x=t.x; flash.y=t.y; projC.addChild(flash); flashes.push(flash);
+  flash.beginFill(0xccffff,0.8); flash.drawCircle(0,0,t.size+6); flash.endFill();
+  spawnFloat(t.x,t.y-20,'⚔青龙斩',0x88eeff,{fontSize:15,life:40});
+  let _wt=0; const _aw=()=>{ _wt+=20; const a=Math.max(0,1-_wt/450); for(const f of flashes) f.alpha=a; flash.scale.set(1+_wt/120); if(_wt<450) requestAnimationFrame(_aw); else { for(const f of flashes) if(projC.children.indexOf(f)>=0) projC.removeChild(f); } }; requestAnimationFrame(_aw);
+}
+
+function spawnGeneralTroop(cell, initialTarget, dmg){
+  const bt=B_TYPES.find(b=>b.key===cell.category);
+  const gen=cell.general;
+  const size=(gen.projSize||6)+2;
+  const hp=bt.dps*lvlScale(cell.lvl)*gen.dpsMul*2.5*2;
+  // 武将从城外生成
+  const laneIdx=cell.px < LANE_BOUNDS[0] ? 0 : (cell.px > LANE_BOUNDS[1] ? 2 : 1);
+  const spawnX=LANES[laneIdx]+(Math.random()-0.5)*14;
+  const spawnY=TROOP_Y_FLOOR - HEX_SIZE*0.5;
+  const cont=new PIXI.Container();
+  const body=new PIXI.Graphics(); body.beginFill(0xffd24a); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  const ring=new PIXI.Graphics(); ring.lineStyle(2,0xffffff,0.6); ring.drawCircle(0,0,size+2); cont.addChild(ring);
+  const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-10,-size-7,20,3); hpBg.endFill(); cont.addChild(hpBg);
+  const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
+  cont.x=spawnX; cont.y=spawnY; projC.addChild(cont);
+  const troop={x:spawnX,y:spawnY,homeX:spawnX,homeY:spawnY,hp,maxHp:hp,dmg,cont,hpFill,size,gen,bt,atkTimer:0,isGeneralTroop:true,sourceCell:cell,srcKey:cell.building,srcName:gen.name,moveSpdMul:gen.spdMul||1,reflect:gen.reflect||0,laneIdx};
+  updateTroopHP(troop); troops.push(troop);
+  spawnFloat(spawnX,spawnY-32,gen.name+' 出征！',0xffd24a);
+}
+
+function spawnRallyTroop(cell, dmg){
+  const laneIdx = cell.px < LANE_BOUNDS[0] ? 0 : cell.px < LANE_BOUNDS[1] ? 1 : 2;
+  // 集结点：建筑格对应列，建筑群外沿再向前约一格
+  const rallyX = LANES[laneIdx];
+  const rallyY = cy - HEX_ROW * 3;
+  const bt=B_TYPES.find(b=>b.key===cell.category);
+  const gen=cell.general; const isMaxLvl=cell.lvl>=TUNE.maxLvl&&gen;
+  const size=isMaxLvl?(gen.projSize||6)+2:5;
+  const hp=bt.dps*lvlScale(cell.lvl)*(isMaxLvl&&gen?gen.dpsMul:1)*2.5*(isMaxLvl?2:1);
+  const cont=new PIXI.Container();
+  const body=new PIXI.Graphics(); body.beginFill(isMaxLvl?0xffd24a:bt.hex,0.65); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  const ring=new PIXI.Graphics(); ring.lineStyle(1.5,0x88ddff,0.7); ring.drawCircle(0,0,size+2); cont.addChild(ring);
+  const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-size-6,16,3); hpBg.endFill(); cont.addChild(hpBg);
+  const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
+  cont.x=cell.px; cont.y=cell.py; projC.addChild(cont);
+  const troop={x:cell.px,y:cell.py,homeX:cell.px,homeY:cell.py,hp,maxHp:hp,dmg,cont,hpFill,size,
+    gen:isMaxLvl&&gen?gen:null,bt,atkTimer:0,charge:!!(cell.general&&cell.general.charge),rallying:true,rallyX,rallyY,
+    isGeneralTroop:isMaxLvl,sourceCell:isMaxLvl?cell:null,srcKey:cell.building,srcName:cell.general?cell.general.name:cell.building,
+    moveSpdMul:isMaxLvl&&gen?gen.spdMul||1:1,reflect:isMaxLvl&&gen?gen.reflect||0:0,laneIdx};
+  updateTroopHP(troop); troops.push(troop);
+  spawnFloat(cell.px,cell.py-28,'→集结',0x88ddff);
+}
+
+function spawnProjectile(sx,sy,tx,ty,hex,size=3,maxLife=18){
+  const cont=new PIXI.Graphics(); cont.beginFill(hex); cont.drawCircle(0,0,size); cont.endFill();
+  cont.x=sx; cont.y=sy; projC.addChild(cont);
+  projectiles.push({sx,sy,tx,ty,cont,life:maxLife,maxLife});
+}
+
+// 太史慈专用：箭头形状穿透弹道（矩形箭身+三角箭头，朝向目标）
+function spawnArrowProjectile(sx,sy,tx,ty,hex,size=4,maxLife=18){
+  const ang=Math.atan2(ty-sy,tx-sx);
+  const L=size*3.5, W=size*0.8, hd=size*1.3;
+  const cont=new PIXI.Graphics();
+  cont.beginFill(hex);
+  cont.moveTo(-L/2,-W/2);
+  cont.lineTo(L/2-hd,-W/2); cont.lineTo(L/2-hd,-W);
+  cont.lineTo(L/2,0);
+  cont.lineTo(L/2-hd,W); cont.lineTo(L/2-hd,W/2);
+  cont.lineTo(-L/2,W/2);
+  cont.closePath(); cont.endFill();
+  cont.x=sx; cont.y=sy; cont.rotation=ang;
+  projC.addChild(cont);
+  projectiles.push({sx,sy,tx,ty,cont,life:maxLife,maxLife,fixedRotation:ang});
+}
+
+function spawnFloat(x,y,txt,hexCol,opts){
+  const life=(opts&&opts.life)||30;
+  const fs=(opts&&opts.fontSize)||13;
+  const c='#'+(typeof hexCol==='number'?hexCol.toString(16).padStart(6,'0'):hexCol.replace('#',''));
+  const t=new PIXI.Text(txt,{fontSize:fs,fill:c,fontWeight:'800',stroke:'#000',strokeThickness:2});
+  t.anchor.set(0.5); t.x=x; t.y=y; t.life=life; t._maxLife=life; floatC.addChild(t); floats.push(t);
+}
+
+function endGame(){
+  gameOver=true;
+  const elapsed = battleStartTime > 0 ? (performance.now() - battleStartTime) / 1000 : 1;
+  const elapsedStr = elapsed >= 60 ? `${Math.floor(elapsed/60)}分${Math.floor(elapsed%60)}秒` : `${Math.floor(elapsed)}秒`;
+  const total = Object.values(damageStats).reduce((s,v)=>s+v.totalDmg, 0);
+  const sorted = Object.entries(damageStats).sort((a,b)=>b[1].totalDmg-a[1].totalDmg);
+  let statsHtml = `<div style="margin-top:8px;width:220px;background:#0a0f14;border:1px solid #1f3040;border-radius:8px;padding:8px 12px;text-align:left">`;
+  statsHtml += `<div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px">战斗统计 &nbsp;<span style="color:#8fa6b2;font-weight:400;">总伤 ${Math.round(total)}</span></div>`;
+  for(const [key, st] of sorted){
+    const pct = total>0?Math.round(st.totalDmg/total*100):0;
+    const dps2 = Math.round(st.totalDmg/elapsed);
+    statsHtml += `<div style="font-size:11px;color:#b0c8d4;padding:2px 0">${st.name}: ${Math.round(st.totalDmg)} <span style="color:#4affff">(${pct}%)</span> / ${dps2} DPS</div>`;
+  }
+  statsHtml += `<div style="font-size:11px;color:#8fa6b2;margin-top:4px;padding-top:4px;border-top:1px solid #1a2830">时长 ${elapsedStr} &nbsp;|&nbsp; 收入 <span style="color:#ffd24a">+${Math.round(goldEarned)}G</span> &nbsp;|&nbsp; 消耗 <span style="color:#ff9955">-${Math.round(goldSpent)}G</span></div>`;
+  statsHtml += `</div>`;
+  const overlay = document.getElementById('gameOverlay');
+  overlay.style.display='flex';
+  const inner = overlay.querySelector('div');
+  if(inner) inner.innerHTML = `<div class="go-text">基地陷落</div>${statsHtml}<button id="btnRestart2" style="margin-top:10px;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:15px;cursor:pointer;">重开</button>`;
+  const btn2 = document.getElementById('btnRestart2');
+  if(btn2) btn2.onclick=()=>{ readTune(); startGame(); };
+}
+
+function trackDmg(key, name, amt){
+  if(!key || !amt || amt <= 0) return;
+  if(!damageStats[key]) damageStats[key] = { totalDmg:0, name: name||key };
+  damageStats[key].totalDmg += amt;
+}
+
+function winGame(){
+  gameWon=true; gameOver=true;
+  const elapsed = battleStartTime > 0 ? (performance.now() - battleStartTime) / 1000 : 1;
+  const elapsedMin = Math.floor(elapsed / 60);
+  const elapsedSec = Math.floor(elapsed % 60);
+  const elapsedStr = elapsedMin > 0 ? `${elapsedMin}分${elapsedSec}秒` : `${Math.floor(elapsed)}秒`;
+  const total = Object.values(damageStats).reduce((s,v)=>s+v.totalDmg, 0);
+  const sorted = Object.entries(damageStats).sort((a,b)=>b[1].totalDmg-a[1].totalDmg);
+  const dps = total > 0 ? Math.round(total / elapsed) : 0;
+  let html = `<div class="ws-title">DPS 统计 &nbsp;<span style="color:#8fa6b2;font-weight:400;">总伤害 ${Math.round(total)}</span></div>`;
+  for(const [key, st] of sorted){
+    const pct = total>0 ? Math.round(st.totalDmg/total*100) : 0;
+    const dps2 = Math.round(st.totalDmg / elapsed);
+    html += `<div class="ws-row"><span class="ws-name">${st.name}</span><span class="ws-nums">${Math.round(st.totalDmg)} 伤 / ${dps2} DPS <span class="ws-pct">(${pct}%)</span></span></div>`;
+  }
+  html += `<div class="ws-row" style="margin-top:6px;border-top:1px solid #2a3d4a;padding-top:5px"><span class="ws-name">战斗时长</span><span class="ws-nums" style="color:#4affff">${elapsedStr}</span></div>`;
+  html += `<div class="ws-row"><span class="ws-name">金币收入</span><span class="ws-nums" style="color:#ffd24a">+${Math.round(goldEarned)}G</span></div>`;
+  html += `<div class="ws-row"><span class="ws-name">翻格消耗</span><span class="ws-nums" style="color:#ff9955">-${Math.round(goldSpent)}G</span></div>`;
+  html += `<div class="ws-row"><span class="ws-name">净收益</span><span class="ws-nums" style="color:${goldEarned-goldSpent>=0?'#4aff8a':'#ff5555'}">${goldEarned-goldSpent>=0?'+':''}${Math.round(goldEarned-goldSpent)}G</span></div>`;
+  const el = document.getElementById('winStats');
+  if(el) el.innerHTML = html;
+  const diffEl=document.getElementById('difficultyEl'); if(diffEl) diffEl.textContent=difficulty;
+  document.getElementById('winOverlay').style.display='flex';
+  spawnFloat(cx,cy-60,'胜利！撑过15波！',0xffd24a);
+}
+
+function showGuideHint(text){ const el=document.getElementById('guideHint'); if(el){el.textContent=text;el.style.display='block';} }
+function hideGuideHint(){ const el=document.getElementById('guideHint'); if(el) el.style.display='none'; }
+function clearGuidePulses(){ for(const c of hexCells){ if(c.guidePulse){ c.cont.removeChild(c.guidePulse); c.guidePulse=null; } } }
+
+// ===== BUFF DETAIL POPUP =====
+function toggleBuffDetail(genName){
+  const el=document.getElementById('buffDetail');
+  if(!el) return;
+  if(buffDetailGen===genName){ buffDetailGen=null; el.style.display='none'; return; }
+  buffDetailGen=genName;
+  renderBuffDetail();
+}
+function renderBuffDetail(){
+  const el=document.getElementById('buffDetail');
+  if(!el||!buffDetailGen) return;
+  const buffs=appliedBuffs.filter(b=>(b.name.split('·')[0]||b.name)===buffDetailGen);
+  if(!buffs.length){ buffDetailGen=null; el.style.display='none'; return; }
+  let html=`<div class="bd-title">${buffDetailGen}</div>`;
+  for(const b of buffs){
+    const sub=b.name.split('·')[1]||b.name;
+    html+=`<div class="bd-item">${b.icon} ${sub}</div>`;
+  }
+  html+=`<div class="bd-close" onclick="buffDetailGen=null;document.getElementById('buffDetail').style.display='none'">关闭</div>`;
+  el.innerHTML=html; el.style.display='block';
+}
+
+// ===== HUD =====
+function updateHUD(){
+  document.getElementById('baseLvlEl').textContent=baseLvl;
+  // 进度条：翻牌次数 → 下次升级进度
+  const canFlip = hexCells.filter(c=>c.state==='flippable'||c.state==='empty').length;
+  const upDone = baseLvl - 1;
+  let progress;
+  if(upDone >= UPGRADE_FLIPS.length){ progress = 100; }
+  else {
+    const prev = upDone>0 ? UPGRADE_FLIPS[upDone-1] : 0;
+    const next = UPGRADE_FLIPS[upDone];
+    progress = (totalFlips - prev) / (next - prev) * 100;
+  }
+  document.getElementById('lvlBar').style.width = Math.max(0,Math.min(100, progress)) + '%';
+  const lvlHintEl=document.getElementById('lvlHintEl');
+  if(lvlHintEl){
+    if(upDone>=UPGRADE_FLIPS.length){ lvlHintEl.textContent='已满级'; lvlHintEl.style.color='#ffd24a'; }
+    else{ const rem=UPGRADE_FLIPS[upDone]-totalFlips; lvlHintEl.textContent='还需'+rem+'次升级'; lvlHintEl.style.color=rem<=2?'#ffd24a':'#ffd24a99'; }
+  }
+  document.getElementById('hpEl').textContent=Math.max(0,baseHP);
+  document.getElementById('hpBar').style.width=(baseHP/maxHP*100)+'%';
+  const hpMaxEl=document.getElementById('hpMaxEl'); if(hpMaxEl) hpMaxEl.textContent='/ '+maxHP;
+  document.getElementById('flipsEl').textContent=canFlip;
+  document.getElementById('summonEl').textContent=totalFlips;
+  const _flipCostEl = document.getElementById('summonCostEl');
+  if(_flipCostEl){
+    if(totalFlips < FLIP_PRICES.length){
+      const _np2 = FLIP_PRICES[totalFlips];
+      _flipCostEl.textContent = '¥'+_np2;
+      _flipCostEl.style.color = gold >= _np2 ? '' : '#ff8844'; // 橙=买不起
+    } else {
+      _flipCostEl.textContent = '上限'; _flipCostEl.style.color = '';
+    }
+  }
+  const goldHudEl2=document.getElementById('goldHudEl'); if(goldHudEl2) goldHudEl2.textContent=Math.round(gold);
+
+  // 强化槽位（以武将为维度，点击展开详情）
+  const buffBarEl = document.getElementById('buffBar');
+  if(buffBarEl){
+    const genMap = {};
+    for(const b of appliedBuffs){
+      const gn = b.name.split('·')[0] || b.name;
+      if(!genMap[gn]) genMap[gn]={ icon:b.icon, count:0 };
+      genMap[gn].count++;
+    }
+    let html = '';
+    for(const gn of Object.keys(genMap)){
+      const g = genMap[gn];
+      html += `<div class="buff-chip" onclick="toggleBuffDetail('${gn}')"><span class="bc-icon">${g.icon}</span><span>${gn}</span><span class="bc-count">×${g.count}</span></div>`;
+    }
+    buffBarEl.innerHTML = html;
+    if(buffDetailGen) renderBuffDetail();
+  }
+}
+
+function setNote(s){ document.getElementById('t_note').textContent=s; }
+
+boot();
+</script>
+</body>
+</html>
