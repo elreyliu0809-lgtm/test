@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>灰盒 v1.2 · 六边形翻地·自由合成·扇形塔防</title>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js-legacy@7.3.2/dist/pixi-legacy.min.js"></script>
 <style>
@@ -81,7 +81,7 @@ body { display:flex; flex-direction:column; align-items:center; }
 .ws-pct { color:#4affff; font-weight:700; }
 #guideHint { position:absolute; top:52px; left:50%; transform:translateX(-50%); background:#4affff18; border:1px solid #4affff66; color:#4affff; padding:6px 16px; border-radius:20px; font-size:12px; font-weight:700; pointer-events:none; display:none; z-index:5; white-space:nowrap; }
 
-#hpHud { width:100%; max-width:480px; background:#0a0f12f0; border-top:2px solid #1f2c34; padding:7px 14px 10px; display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+#hpHud { width:100%; max-width:480px; background:#0a0f12f0; border-top:2px solid #1f2c34; padding:7px 14px 10px; padding-bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) + 10px)); display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
 .bhud-row { display:flex; align-items:center; gap:8px; }
 #hpHud .hp-lbl { font-size:11px; color:#8fa6b2; white-space:nowrap; }
 #hpHud .hp-val { font-size:18px; font-weight:800; color:#ff5a5a; white-space:nowrap; line-height:1; min-width:40px; }
@@ -210,7 +210,7 @@ const START_GOLD = 100;
 // ===== 建筑（进攻=出兵，防守=站桩远程） =====
 const B_TYPES = [
   { key:'advance', name:'进攻', hex:0xff5a5a, css:'#ff5a5a', glyph:'⚔', range:2.0, dps:6, troopSpd:0.33 },
-  { key:'defense', name:'防守', hex:0x4a9eff, css:'#4a9eff', glyph:'◈', range:2.0, dps:4 },
+  { key:'defense', name:'防守', hex:0x4a9eff, css:'#4a9eff', glyph:'◈', range:2.4, dps:4 },
 ];
 
 // ===== 武将池（进攻：产亲兵出征；防守：站桩远程输出） =====
@@ -351,7 +351,7 @@ const GENERAL_UPGRADES = {
 const HEX_SIZE = 32;
 const HEX_COL = 1.5 * HEX_SIZE;          // 平顶：列间距（水平）
 const HEX_ROW = Math.sqrt(3) * HEX_SIZE; // 平顶：行间距（垂直）
-const RANGED_RANGE_CAP = HEX_ROW * 8;    // 远程有效射程上限（约8格），防一杆覆盖全场（B案，可调）
+const RANGED_RANGE_CAP = HEX_ROW * 9;    // 远程有效射程上限（Bug-5 fix: 从8扩为9），防一杆覆盖全场（B案，可调）
 
 function hexToPixel(q, r, cx, cy) {
   return { x: HEX_COL * q + cx, y: HEX_ROW * (r + q*0.5) + cy };
@@ -534,7 +534,7 @@ function boot(){
   const canvas = document.getElementById('stage');
   const area = document.getElementById('gameArea');
   W = Math.min(480, window.innerWidth);
-  H = area.clientHeight || (window.innerHeight - 36);
+  H = area.clientHeight || Math.max(window.innerHeight - 60, 600);
   canvas.width = W; canvas.height = H;
 
   app = new PIXI.Application({ view:canvas, width:W, height:H,
@@ -1174,8 +1174,8 @@ function spawnWave(){
   spawnFloat(LANES[laneIdx], 32, '▼ '+LANE_NAMES[laneIdx], wt.color, {life:150,fontSize:14});
   spawnGroup(wt, hp, count, laneIdx);
 
-  // 波次5-7：延迟2s出疾行斥候，填补BOSS前的送金空窗
-  if(waveCount >= 5 && waveCount <= 7 && typeIdx !== 3){
+  // 波次4-7：延迟2s出疾行斥候，填补第4波间隔拉长+波5-7的送金空窗（Bug-4 fix: 覆盖第4波）
+  if(waveCount >= 4 && waveCount <= 7 && typeIdx !== 3){
     const spd = WAVE_TYPES[3]; // 疾行
     const bonusLane = (laneIdx + 1 + Math.floor(Math.random()*2)) % 3;
     const bonusCnt = 2 + (waveCount - 4); // 3/4/5只
@@ -1433,6 +1433,13 @@ function tick(dt){
 
     // 已到达城墙，持续攻击（蔚蓝模式）
     if(e.attacking){
+      // Bug-2 fix: 吕布击退越墙保护——敌人被推入基地核心区时强制重置回ring1外侧
+      if(e.y > cy - HEX_ROW){
+        e.attacking = false;
+        e.y = Math.min(e.y, cy - HEX_ROW - HEX_SIZE);
+        e.cont.x = e.x; e.cont.y = e.y;
+        // fall through to movement code below
+      } else {
       if(e.noAttack){ continue; } // 精英怪：只驻城不攻击，纯压迫感
       e.atkTimer = (e.atkTimer || 0) + app.ticker.deltaMS;
       const atkInterval = (globalBuffs.tauntAtkSlow_caoren && e._taunted) ? 3333 : 2000; // 曹仁镇慑：攻速-40%
@@ -1444,6 +1451,7 @@ function tick(dt){
         updateHUD();
       }
       continue;
+      } // end else (normal attacking)
     }
 
     // 曹仁亲兵嘲讽：亲兵周围一圈内敌人转向曹仁亲兵（强化后两圈）
@@ -1527,8 +1535,14 @@ function tick(dt){
     boss.basicTimer = (boss.basicTimer||0) + app.ticker.deltaMS;
     if(boss.basicTimer >= 3500){
       boss.basicTimer = 0;
-      let bt=null, bd=Infinity;
-      for(const t of troops){ const d=Math.sqrt((t.x-boss.x)**2+(t.y-boss.y)**2); if(d<HEX_SIZE*5 && d<bd){bd=d;bt=t;} }
+      // Bug-6 fix: 优先找中路近战亲兵（低等级近战将吸引力弱，给其创造存在感）
+      const meleeTroops = troops.filter(t => Math.abs(t.x - boss.x) < HEX_SIZE * 4 && t.y > boss.y);
+      let bt = meleeTroops.length > 0 ? meleeTroops.reduce((a,b) => a.y < b.y ? a : b) : null;
+      if(!bt){
+        // 无近战亲兵：原有逻辑，找范围内最近亲兵
+        let bd=Infinity;
+        for(const t of troops){ const d=Math.sqrt((t.x-boss.x)**2+(t.y-boss.y)**2); if(d<HEX_SIZE*5 && d<bd){bd=d;bt=t;} }
+      }
       if(bt){
         const kdx=bt.x-boss.x, kdy=bt.y-boss.y, kd=Math.sqrt(kdx*kdx+kdy*kdy)||1;
         bt.x += (kdx/kd)*HEX_SIZE*2.5 + (Math.random()-0.5)*14;
@@ -2128,6 +2142,8 @@ function tick(dt){
           }
           t.cont.x=t.x; t.cont.y=t.y;
         }
+        // Bug-1 fix: 无敌时不得超过传送门区域，防止小屏手机 rallyY 过小时上冲抖动
+        if (t.y < HEX_SIZE * 3) { t.y = HEX_SIZE * 3; t.cont.y = t.y; }
         continue;
       }
     }
