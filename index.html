@@ -548,7 +548,7 @@ function boot(){
 
   cx = W/2;
   // 平顶布局：基地偏下居中，领地向上(敌方向)铺展，后排格留在基地下方
-  cy = H - HEX_SIZE * 2.5 - 16;
+  cy = H - HEX_SIZE * 2.5 - 51; // Bug-7: +35px margin so q=3,r=0 bottom hex clears canvas bottom
 
   // 三路几何：路中心 = 左/中/右，分割带在路与路之间，汇聚线在领地前端之上
   const laneSpread = HEX_COL * 3; // 左/右路中心在q=±3
