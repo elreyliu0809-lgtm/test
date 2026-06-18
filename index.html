@@ -118,11 +118,8 @@ body { display:flex; flex-direction:column; align-items:center; }
 <div id="tune">
   <b>TUNE v1.2</b>
   <label>合成阶数<input id="t_maxLvl" type="number" value="4"></label>
-  <label>每次解锁<input id="t_unlock" type="number" value="4"></label>
   <label>波次ms<input id="t_waveMs" type="number" value="8000" style="width:44px"></label>
   <label>敌速<input id="t_enemySpd" type="number" value="0.4" style="width:36px"></label>
-  <label>翻CD<input id="t_flipCd" type="number" value="800" style="width:44px"></label>
-  <label>免CD次数<input id="t_freeFlips" type="number" value="0" style="width:30px"></label>
   <label>金币倍率<input id="t_goldMul" type="number" value="1.0" style="width:36px"></label>
   <button id="t_apply">重开</button>
   <span id="t_note" style="color:#5f7480"></span>
@@ -522,11 +519,8 @@ function burstSound(n){ for(let i=0;i<Math.min(n,5);i++) setTimeout(()=>blip(380
 function readTune(){
   const g=id=>parseFloat(document.getElementById(id).value)||0;
   TUNE.maxLvl=Math.max(2,Math.min(5,g('t_maxLvl')));
-  TUNE.unlockCount=Math.max(1,Math.min(6,g('t_unlock')));
   TUNE.waveMs=Math.max(1000,g('t_waveMs'));
   TUNE.enemySpd=Math.max(0.2,g('t_enemySpd'));
-  TUNE.flipCdMs=Math.max(0,g('t_flipCd'));
-  TUNE.initFreeFlips=Math.max(0,g('t_freeFlips'));
   TUNE.goldMul=Math.max(0.1,g('t_goldMul')||1.0);
 }
 
@@ -726,7 +720,7 @@ function drawLanes(){
   g.lineStyle(0);
   // 传送门：左路(LANES[0])蓝色 + 右路(LANES[2])橙红 + 中路绿色（下移2格）
   const portalY = HEX_SIZE * 2;
-  const pr = HEX_SIZE * 1.8;
+  const pr = HEX_SIZE * 0.8; // 缩小至六边形格内（内切圆半径≈HEX_SIZE*0.87，留少量间距）
   // 左路传送门
   g.lineStyle(3, 0x44aaff, 0.85); g.beginFill(0x44aaff, 0.12); g.drawCircle(LANES[0], portalY, pr); g.endFill(); g.lineStyle(0);
   g.lineStyle(2, 0x44aaff, 0.5); g.drawCircle(LANES[0], portalY, pr*0.5); g.lineStyle(0);
