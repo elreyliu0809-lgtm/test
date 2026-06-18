@@ -118,8 +118,6 @@ body { display:flex; flex-direction:column; align-items:center; }
 <div id="tune">
   <b>TUNE v1.2</b>
   <label>合成阶数<input id="t_maxLvl" type="number" value="4"></label>
-  <label>波次ms<input id="t_waveMs" type="number" value="8000" style="width:44px"></label>
-  <label>敌速<input id="t_enemySpd" type="number" value="0.4" style="width:36px"></label>
   <label>金币倍率<input id="t_goldMul" type="number" value="1.0" style="width:36px"></label>
   <button id="t_apply">重开</button>
   <span id="t_note" style="color:#5f7480"></span>
@@ -192,7 +190,7 @@ const TUNE = {
 };
 
 // 每击杀金币掉落：Math.round(waveCount * GOLD_PER_KILL[waveType] * TUNE.goldMul)
-const GOLD_PER_KILL = { normal:6, swarm:3, elite:50, speed:5 };
+const GOLD_PER_KILL = { normal:6, swarm:3, elite:15, speed:5 };
 
 // 翻牌累计达到这些次数时基地升级并解锁地格（单局约5次，对标蔚蓝的低频升级）
 // 升级与"铺满地块"解耦——合成只为战力服务，不再左右升级节奏
@@ -519,8 +517,6 @@ function burstSound(n){ for(let i=0;i<Math.min(n,5);i++) setTimeout(()=>blip(380
 function readTune(){
   const g=id=>parseFloat(document.getElementById(id).value)||0;
   TUNE.maxLvl=Math.max(2,Math.min(5,g('t_maxLvl')));
-  TUNE.waveMs=Math.max(1000,g('t_waveMs'));
-  TUNE.enemySpd=Math.max(0.2,g('t_enemySpd'));
   TUNE.goldMul=Math.max(0.1,g('t_goldMul')||1.0);
 }
 
@@ -1125,7 +1121,7 @@ const WAVE_TYPES = [
   { key:'normal', name:'常规', countMul:1.0, hpMul:1.0,  spdMul:1.0,  color:0xff3333, size:8 },
   { key:'swarm',  name:'人海', countMul:2.5, hpMul:0.6,  spdMul:1.1,  color:0xff6633, size:6 },
   { key:'elite',  name:'精英', countMul:0.15,hpMul:10.0, spdMul:0.3, color:0xcc00ff, size:16, noAttack:true },
-  { key:'speed',  name:'疾行', countMul:1.0, hpMul:0.6,  spdMul:1.9,  color:0x33ffaa, size:7 },
+  { key:'speed',  name:'疾行', countMul:1.5, hpMul:0.6,  spdMul:1.9,  color:0x33ffaa, size:7 },
 ];
 
 function lvlScale(lvl){ return Math.pow(1.7, lvl - 1); }
@@ -1181,10 +1177,14 @@ function spawnWave(){
     setTimeout(()=>{ if(!gameOver) spawnGroup(spd, Math.round(hpBase*spd.hpMul*0.8), bonusCnt, bonusLane); }, 2000);
     spawnFloat(LANES[bonusLane], 40, '⚡斥候', spd.color, {life:120,fontSize:12});
   }
-  // 精英波：添加速度缓慢的随行护卫（簇拥精英）
+  // 精英波：添加速度缓慢的随行护卫（簇拥精英）+ 疾行前锋填补波次间隙
   if(typeIdx === 2){
     const escortWt = { key:'normal', name:'随行', countMul:1, hpMul:1, spdMul:0.25, color:0xcc88ff, size:6, noAttack:false };
     spawnGroup(escortWt, Math.round(hpBase*2), 2, laneIdx);
+    // 2.5s后在另一路出3只疾行前锋，填补精英波→下波的空窗期，并补充少量金币
+    const _fastLane = (laneIdx + 1 + Math.floor(Math.random()*2)) % 3;
+    spawnFloat(LANES[_fastLane], 40, '⚡疾行前锋', WAVE_TYPES[3].color, {life:150, fontSize:12});
+    setTimeout(()=>{ if(!gameOver) spawnGroup(WAVE_TYPES[3], Math.round(hpBase * WAVE_TYPES[3].hpMul), 3, _fastLane); }, 2500);
   }
 }
 
@@ -2147,8 +2147,18 @@ function tick(dt){
       }
     }
     if(!enemies.length){
-      if(t.isGeneralTroop&&t.sourceCell){ t.sourceCell.generalOut=false; t.sourceCell.generalRespawnTimer=0; }
-      removeTroop(i); continue;
+      // 全部波次结束才清除亲兵；波次间隙让亲兵集结待命，不提前消失
+      if(waveCount > 15 || gameWon){
+        if(t.isGeneralTroop&&t.sourceCell){ t.sourceCell.generalOut=false; t.sourceCell.generalRespawnTimer=0; }
+        removeTroop(i); continue;
+      }
+      if(!t.rallying){
+        t.rallying = true;
+        const _rLane = t.laneIdx!=null ? t.laneIdx : 1;
+        t.rallyX = LANES[_rLane];
+        t.rallyY = cy - HEX_ROW * 3;
+      }
+      continue;
     }
     let nearest=null, nd=Infinity;
     for(const e of enemies){ const d=Math.sqrt((e.x-t.x)**2+(e.y-t.y)**2); if(d<nd){nd=d;nearest=e;} }
@@ -2419,7 +2429,8 @@ function spawnTroop(cell, initialTarget, dmg){
   const hp=bt.dps*lvlScale(cell.lvl)*dpsMul*2.5;
   const size=isGen?(gen.projSize||6):5;
   // 从城外生成，不在建筑格内出现
-  const laneIdx=cell.px < LANE_BOUNDS[0] ? 0 : (cell.px > LANE_BOUNDS[1] ? 2 : 1);
+  const _cqT=Math.round((cell.px - cx) / HEX_COL);
+  const laneIdx=_cqT < 0 ? 0 : _cqT > 0 ? 2 : 1;
   const spawnX=LANES[laneIdx]+(Math.random()-0.5)*18;
   const spawnY=TROOP_Y_FLOOR - HEX_SIZE*0.5;
   const cont=new PIXI.Container();
@@ -2488,7 +2499,8 @@ function spawnGeneralTroop(cell, initialTarget, dmg){
   const size=(gen.projSize||6)+2;
   const hp=bt.dps*lvlScale(cell.lvl)*gen.dpsMul*2.5*2;
   // 武将从城外生成
-  const laneIdx=cell.px < LANE_BOUNDS[0] ? 0 : (cell.px > LANE_BOUNDS[1] ? 2 : 1);
+  const _cqG=Math.round((cell.px - cx) / HEX_COL);
+  const laneIdx=_cqG < 0 ? 0 : _cqG > 0 ? 2 : 1;
   const spawnX=LANES[laneIdx]+(Math.random()-0.5)*14;
   const spawnY=TROOP_Y_FLOOR - HEX_SIZE*0.5;
   const cont=new PIXI.Container();
@@ -2503,7 +2515,8 @@ function spawnGeneralTroop(cell, initialTarget, dmg){
 }
 
 function spawnRallyTroop(cell, dmg){
-  const laneIdx = cell.px < LANE_BOUNDS[0] ? 0 : cell.px < LANE_BOUNDS[1] ? 1 : 2;
+  const _cqRal=Math.round((cell.px - cx) / HEX_COL);
+  const laneIdx = _cqRal < 0 ? 0 : _cqRal > 0 ? 2 : 1;
   // 集结点：建筑格对应列，建筑群外沿再向前约一格
   const rallyX = LANES[laneIdx];
   const rallyY = cy - HEX_ROW * 3;
