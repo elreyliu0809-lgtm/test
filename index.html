@@ -1125,6 +1125,8 @@ function flipCell(cell){
   drawCell(cell);
 
   totalFlips++;
+  // 每将翻出次数统计（供战报"翻格效率"使用）
+  if(gen && gen.key){ if(!damageStats[gen.key]) damageStats[gen.key]={name:gen.name,totalDmg:0,flipCount:0}; damageStats[gen.key].flipCount=(damageStats[gen.key].flipCount||0)+1; }
   const _priceIdx = Math.min(totalFlips - 1, FLIP_PRICES.length - 1);
   const _price = FLIP_PRICES[_priceIdx];
   gold -= _price; goldSpent += _price;
@@ -1446,6 +1448,10 @@ function tick(dt){
   waveTimer += app.ticker.deltaMS;
   const _curWaveMs = waveCount <= 6 ? 9000 : waveCount <= 12 ? 10000 : 8000;
   if(waveTimer>=_curWaveMs && !inDraft){ waveTimer=0; spawnWave(); }
+  // 安全扫除：清理越界（吕布击退出屏）或 hp≤0 的残余敌人，防止卡死胜负判断
+  for(let _si=enemies.length-1;_si>=0;_si--){
+    if(enemies[_si].hp<=0 || enemies[_si].y < -HEX_SIZE*2){ removeEnemy(_si); }
+  }
   // 胜利判断：15波全部发完 + 场上无残敌
   if(waveCount > 15 && enemies.length === 0){ winGame(); return; }
   if(_waveTimerEl) _waveTimerEl.textContent = waveCount>15 ? '清场中' : Math.max(0,Math.ceil((_curWaveMs-waveTimer)/1000))+'s';
@@ -1728,6 +1734,15 @@ function tick(dt){
     const burnPerTick = burnDps * (app.ticker.deltaMS / 1000);
     const burnRMul = globalBuffs.burnRadiusMul_dianwei || 1;
     const burnRHex = Math.max(1, Math.round(HEX_SIZE * 2 * burnRMul / HEX_ROW));
+    // 典韦灼烧光环视觉：常驻橙红脉冲环（每帧重绘，sin 波动 alpha）
+    if(!cell._burnAuraGfx){ cell._burnAuraGfx=new PIXI.Graphics(); projC.addChild(cell._burnAuraGfx); }
+    const _bpulse = 0.35 + 0.25*Math.sin(now/400);
+    cell._burnAuraGfx.clear();
+    cell._burnAuraGfx.lineStyle(2.5, 0xff4400, _bpulse);
+    cell._burnAuraGfx.drawCircle(cell.px, cell.py, burnRHex*HEX_SIZE*0.82);
+    cell._burnAuraGfx.beginFill(0xff4400, _bpulse*0.08);
+    cell._burnAuraGfx.drawCircle(cell.px, cell.py, burnRHex*HEX_SIZE*0.82);
+    cell._burnAuraGfx.endFill();
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
       if(hexDistance(cell.px,cell.py,e.x,e.y) <= burnRHex){
@@ -2198,24 +2213,23 @@ function tick(dt){
 
   for(let i=troops.length-1;i>=0;i--){
     const t=troops[i];
-    // 曹仁嘲讽范围可视化（六边形格高亮，仅当范围内有敌时显示=触发式）
+    // 曹仁嘲讽：CD 1500ms 单次扩散圆环特效，常驻状态靠敌人身上的 debuff 橙环显示
     if(t.srcName==='曹仁'){
-      if(!t._tauntGfx){ t._tauntGfx=new PIXI.Graphics(); t.cont.addChildAt(t._tauntGfx,0); }
-      const N = (t.gen && t.gen.key==='caoren' && globalBuffs.tauntRangeMul_caoren) ? 2 : 1; // 扩范围仅本体生效
+      const N = (t.gen && t.gen.key==='caoren' && globalBuffs.tauntRangeMul_caoren) ? 2 : 1;
       let anyInRange=false;
       for(const e of enemies){ if(hexDistance(t.x,t.y,e.x,e.y)<=N){ anyInRange=true; break; } }
-      t._tauntGfx.clear();
-      if(anyInRange){
-        const cur=pixelToAxial(t.x,t.y);
-        for(let dq=-N; dq<=N; dq++){
-          for(let dr=Math.max(-N,-dq-N); dr<=Math.min(N,-dq+N); dr++){
-            const p=hexToPixel(cur.q+dq, cur.r+dr, cx, cy);
-            const lx=p.x-t.x, ly=p.y-t.y;
-            t._tauntGfx.beginFill(0xffaa44,0.10); t._tauntGfx.drawPolygon(hexPoly(lx,ly,HEX_SIZE-3)); t._tauntGfx.endFill();
-            t._tauntGfx.lineStyle(1.5,0xffaa44,0.55); t._tauntGfx.drawPolygon(hexPoly(lx,ly,HEX_SIZE-3)); t._tauntGfx.lineStyle(0);
-          }
-        }
+      const _tnow=performance.now();
+      if(anyInRange && (!t._tauntAnimAt || _tnow-t._tauntAnimAt>1500)){
+        t._tauntAnimAt=_tnow;
+        const rg=new PIXI.Graphics(); rg.x=t.x; rg.y=t.y; projC.addChild(rg);
+        addFadeAnim(projC, rg, 600, (et, alpha)=>{
+          rg.clear();
+          const r=N*HEX_SIZE*(1+et/600*0.4);
+          rg.lineStyle(2.5, 0xffaa44, alpha*0.9);
+          rg.drawCircle(0, 0, r);
+        });
       }
+      if(t._tauntGfx){ t._tauntGfx.clear(); }
     }
     // 集结模式：向集结点前进，三圈内有敌再出击
     if(t.rallying){
@@ -2261,40 +2275,53 @@ function tick(dt){
     const tdx=nearest.x-t.x, tdy=nearest.y-t.y;
     const tdist=Math.sqrt(tdx*tdx+tdy*tdy);
 
-    // 关羽·剑气波：亲兵不贴脸——3格内蓄力+逼近，2格内蓄满即放穿透剑气波（不吃melee反伤）
+    // 关羽：普通亲兵→基础剑气（1格穿，强化2格），大将亲兵→蓄力青龙波（2格穿，强化3格）
     if(t.gen && t.gen.key==='guanyu'){
       const hd=hexDistance(t.x,t.y,nearest.x,nearest.y);
       const gMov=(t.moveSpdMul||1)*(t.bt&&t.bt.troopSpd||0.25);
-      const CHARGE_MS=1000;          // 蓄力时长（可调）
       const obsClamp=()=>{ if(t.y < LANE_MERGE_Y - HEX_ROW*2){ const ob=HEX_SIZE+4;
         if(t.laneIdx===0) t.x=Math.min(t.x,LANE_BOUNDS[0]-ob);
         else if(t.laneIdx===2) t.x=Math.max(t.x,LANE_BOUNDS[1]+ob);
         else t.x=Math.max(LANE_BOUNDS[0]+ob,Math.min(t.x,LANE_BOUNDS[1]-ob)); } };
-      if(hd>3){
-        // 远：清空蓄力，沿格快速推进找怪
-        t._charge=0; if(t._chargeGfx) t._chargeGfx.visible=false;
-        const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
-        const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
-        t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
-      } else {
-        // 3格内：开始蓄力
-        t._charge=(t._charge||0)+app.ticker.deltaMS;
-        if(!t._chargeGfx){ t._chargeGfx=new PIXI.Graphics(); t.cont.addChild(t._chargeGfx); }
-        t._chargeGfx.visible=true;
-        const cp=Math.min(1,t._charge/CHARGE_MS);
-        t._chargeGfx.clear(); t._chargeGfx.lineStyle(2,0x66ddff,0.4+0.55*cp); t._chargeGfx.drawCircle(0,0,t.size+4+cp*7);
-        if(cp>=1){ t._chargeGfx.beginFill(0xaaffff,0.22); t._chargeGfx.drawCircle(0,0,t.size+2); t._chargeGfx.endFill(); }
+
+      if(!t.isGeneralTroop){
+        // 普通亲兵：推进到2格内，400ms发射基础剑气（穿1格，义绝→穿2格）
         if(hd>2){
-          // 2~3格：边蓄力边慢速逼近到放波距离
           const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
           const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
-          t.x+=wdx/wl*gMov*0.6*dt; t.y+=wdy/wl*gMov*0.6*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
-        } else if(t._charge>=CHARGE_MS){
-          // ≤2格且蓄满：释放剑气波
-          t._charge=0; t._chargeGfx.visible=false;
-          const tnow=performance.now();
-          const guanyuBonus=globalBuffs.presenceBuff_guanyu ? 1+Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
-          fireGuanyuWave(t, nearest, t.dmg*guanyuBonus*3.0);    // 蓄力穿透爆发×3.0（可调）
+          t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
+        } else {
+          t._atkTimer=(t._atkTimer||0)+app.ticker.deltaMS;
+          if(t._atkTimer>=400){
+            t._atkTimer=0;
+            fireGuanyuBasicSlash(t, nearest, t.dmg*1.5);
+          }
+        }
+      } else {
+        // 大将亲兵：蓄力青龙波（2格穿，义绝→3格）
+        const CHARGE_MS=1000;
+        if(hd>3){
+          t._charge=0; if(t._chargeGfx) t._chargeGfx.visible=false;
+          const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
+          const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
+          t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
+        } else {
+          t._charge=(t._charge||0)+app.ticker.deltaMS;
+          if(!t._chargeGfx){ t._chargeGfx=new PIXI.Graphics(); t.cont.addChild(t._chargeGfx); }
+          t._chargeGfx.visible=true;
+          const cp=Math.min(1,t._charge/CHARGE_MS);
+          t._chargeGfx.clear(); t._chargeGfx.lineStyle(2,0x66ddff,0.4+0.55*cp); t._chargeGfx.drawCircle(0,0,t.size+4+cp*7);
+          if(cp>=1){ t._chargeGfx.beginFill(0xaaffff,0.22); t._chargeGfx.drawCircle(0,0,t.size+2); t._chargeGfx.endFill(); }
+          if(hd>2){
+            const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
+            const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
+            t.x+=wdx/wl*gMov*0.6*dt; t.y+=wdy/wl*gMov*0.6*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
+          } else if(t._charge>=CHARGE_MS){
+            t._charge=0; t._chargeGfx.visible=false;
+            const tnow=performance.now();
+            const guanyuBonus=globalBuffs.presenceBuff_guanyu ? 1+Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
+            fireGuanyuWave(t, nearest, t.dmg*guanyuBonus*3.0);
+          }
         }
       }
       continue;
@@ -2548,6 +2575,36 @@ function updateTroopHP(t){
 
 function removeTroop(idx){ projC.removeChild(troops[idx].cont); troops.splice(idx,1); }
 
+// 关羽·基础剑气：普通亲兵400ms出一次，穿1格（义绝→2格），轻量刀光
+function fireGuanyuBasicSlash(t, target, dmg){
+  const cur=pixelToAxial(t.x,t.y);
+  const gdx=target.x-t.x, gdy=target.y-t.y, gl=Math.hypot(gdx,gdy)||1;
+  let bestDir=HEX_DIRS[0], bestScore=-Infinity;
+  for(const [dq,dr] of HEX_DIRS){
+    const np=hexToPixel(cur.q+dq,cur.r+dr,cx,cy);
+    const ndx=np.x-t.x, ndy=np.y-t.y, nl=Math.hypot(ndx,ndy)||1;
+    const s=(ndx*gdx+ndy*gdy)/(nl*gl);
+    if(s>bestScore){ bestScore=s; bestDir=[dq,dr]; }
+  }
+  const pierceLen=globalBuffs.troopSplash_guanyu?2:1;
+  const startC=hexToPixel(cur.q,cur.r,cx,cy);
+  const cells=[]; for(let k=1;k<=pierceLen;k++) cells.push(hexToPixel(cur.q+bestDir[0]*k, cur.r+bestDir[1]*k, cx, cy));
+  const last=cells[cells.length-1];
+  const wg=new PIXI.Graphics(); projC.addChild(wg);
+  wg.lineStyle(4,0x99eeff,0.8); wg.moveTo(startC.x,startC.y); wg.lineTo(last.x,last.y);
+  addFadeAnim(projC, wg, 220, (et,alpha)=>{ wg.alpha=alpha; });
+  for(const c of cells){
+    for(let j=enemies.length-1;j>=0;j--){
+      const pe=enemies[j];
+      if(sameHexCell(pe.x,pe.y,c.x,c.y)){
+        pe.hp-=dmg; trackDmg(t.srcKey,t.srcName,dmg);
+        spawnFloat(pe.x,pe.y-10,Math.round(dmg)+'',0x99eeff);
+        if(pe.hp<=0){spawnFloat(pe.x,pe.y-12,'剑气',0x99eeff);removeEnemy(j);}else updateEnemyHP(pe);
+      }
+    }
+  }
+}
+
 // 关羽·青龙斩：沿六边形六方向之一(朝目标)格对齐穿透3格（义绝→5格），逐格命中
 function fireGuanyuWave(t, target, dmg){
   const cur=pixelToAxial(t.x,t.y);
@@ -2560,7 +2617,7 @@ function fireGuanyuWave(t, target, dmg){
     const s=(ndx*gdx+ndy*gdy)/(nl*gl);
     if(s>bestScore){ bestScore=s; bestDir=[dq,dr]; }
   }
-  const pierceLen=globalBuffs.troopSplash_guanyu?5:3;   // 义绝→穿透更远
+  const pierceLen=globalBuffs.troopSplash_guanyu?3:2;   // 义绝→穿透3格
   const startC=hexToPixel(cur.q,cur.r,cx,cy);
   const cells=[]; for(let k=1;k<=pierceLen;k++) cells.push(hexToPixel(cur.q+bestDir[0]*k, cur.r+bestDir[1]*k, cx, cy));
   const last=cells[cells.length-1];
@@ -2706,12 +2763,13 @@ function buildWarReport(isWin, failedWave){
   for(const [,st] of sorted){
     const pct = total>0 ? Math.round(st.totalDmg/total*100) : 0;
     const dps2 = Math.round(st.totalDmg/elapsed);
+    const flipEff = st.flipCount > 0 ? Math.round(st.totalDmg / st.flipCount) + '伤/翻' : '—';
     const nameColor = st.name && draftPicks.find(g=>g.name===st.name&&g.category==='advance') ? '#ffb060' : '#4affff';
-    dpsRows += `<div style="font-size:10.5px;color:${nameColor};padding:1px 0">${st.name}  ${Math.round(st.totalDmg)}伤 <span style="color:#ffd24a">(${pct}%)</span> · ${dps2}dps</div>`;
+    dpsRows += `<div style="font-size:10.5px;color:${nameColor};padding:1px 0">${st.name} ×${st.flipCount||0}翻  ${Math.round(st.totalDmg)}伤 <span style="color:#ffd24a">(${pct}%)</span> · <span style="color:#b0e0ff">${flipEff}</span></div>`;
   }
 
   return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.3 ──</div>
+    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4 ──</div>
     ${R('阵容', lineup, '#fff')}
     <div style="font-size:10.5px;padding:1px 0"><span style="color:#8fa6b2">结果</span> ${resultStr} &nbsp;<span style="color:#8fa6b2">时长</span> <span style="color:#4affff">${elapsedStr}</span> &nbsp;<span style="color:#8fa6b2">翻格</span> <span style="color:#ffd24a">${totalFlips}次</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
@@ -2721,8 +2779,8 @@ function buildWarReport(isWin, failedWave){
     <div style="color:#ffb060;font-size:10px;margin-bottom:2px">★ 近战专项</div>
     <div style="font-size:10.5px;color:#d0e8f0">拦截 <span style="color:#ffd24a">${interceptCount}</span>怪 &nbsp;·&nbsp; 护盾承伤 <span style="color:#ffd24a">${wallDmgAbsorbed}</span> (<span style="color:#ffd24a">${shieldPct}%</span>) &nbsp;·&nbsp; 峰值小兵 <span style="color:#ffd24a">${peakTroopCount}</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
-    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">经济</div>
-    <div style="font-size:10.5px;color:#d0e8f0">净 <span style="color:${netColor}">${net>=0?'+':''}${net}G</span> &nbsp;·&nbsp; 谷底 <span style="color:#ffd24a">${Math.round(goldFloor)}G</span> &nbsp;·&nbsp; 被迫停翻 <span style="color:${forcedStopFlip?'#ff5555':'#4aff8a'}">${forcedStopFlip?'Y':'N'}</span></div>
+    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">翻格效率</div>
+    <div style="font-size:10.5px;color:#d0e8f0">全局 <span style="color:#b0e0ff">${totalFlips > 0 ? Math.round(total / totalFlips) : 0}伤/翻</span> &nbsp;·&nbsp; 共翻 <span style="color:#ffd24a">${totalFlips}次</span> &nbsp;·&nbsp; 总伤 <span style="color:#ffd24a">${Math.round(total)}</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
     <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">BOSS</div>
     <div style="font-size:10.5px;color:#d0e8f0">到达时城墙 <span style="color:#ffd24a">${bossArrPct}</span> &nbsp;·&nbsp; 被杀于 <span style="color:#ffd24a">${bossKillStr}</span></div>
