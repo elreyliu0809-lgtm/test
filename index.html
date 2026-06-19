@@ -492,6 +492,13 @@ let isFirstGame = true;
 let inDraft = false; // 选将阶段暂停出怪
 let damageStats = {}; // { genKey: { totalDmg, name } }
 let battleStartTime = 0;
+let interceptCount = 0;   // 被亲兵近战击杀的怪数
+let peakTroopCount = 0;   // 同屏亲兵峰值
+let goldFloor = 9999;     // 游戏中金币最低值
+let forcedStopFlip = false; // 因没钱被迫停翻
+let wallDmgAbsorbed = 0;  // 护盾层吸收的攻击伤害
+let bossArrivalHp = -1;   // Boss首次进攻时城墙HP
+let bossKillTime = -1;    // Boss被杀时的战斗秒数
 
 let selectedCell = null;
 let rangeOverlayGfx = null;   // 选中塔时显示的"射程格"覆盖层
@@ -592,6 +599,8 @@ function startGame(){
   wallFlash=0;
   gold=START_GOLD; goldTrickleTimer=0; goldSpent=0; goldEarned=START_GOLD;
   damageStats={}; battleStartTime=0;
+  interceptCount=0; peakTroopCount=0; goldFloor=START_GOLD; forcedStopFlip=false;
+  wallDmgAbsorbed=0; bossArrivalHp=-1; bossKillTime=-1;
   selectedCell=null; mergeMode=false; rangeOverlayGfx=null; rangeOverlayCell=null;
   globalBuffs={}; pendingPick=null; draftPicks=[];
   troops=[]; attackTimers={}; boss=null; bossAoe=null; bossChest=null; fireZones=[]; stormZones=[]; wallRegenTimer=0;
@@ -888,6 +897,7 @@ function onCellClick(cell){
   if(cell.state==='flippable' || cell.state==='empty'){
     const _np = FLIP_PRICES[Math.min(totalFlips, FLIP_PRICES.length-1)];
     if(gold < _np){
+      forcedStopFlip = true;
       spawnFloat(cell.px, cell.py-20, '需要'+_np+'G', 0xff8844);
       blip(200, 0.05, 'sine', 0.06);
       return;
@@ -1118,6 +1128,7 @@ function flipCell(cell){
   const _priceIdx = Math.min(totalFlips - 1, FLIP_PRICES.length - 1);
   const _price = FLIP_PRICES[_priceIdx];
   gold -= _price; goldSpent += _price;
+  if(gold < goldFloor) goldFloor = gold;
   blip(480+Math.random()*80, 0.06, 'triangle', 0.12);
   cell.cont.scale.set(1.15); setTimeout(()=>cell.cont.scale.set(1),100);
   const bt = B_TYPES.find(b=>b.key===gen.category);
@@ -1305,6 +1316,7 @@ function spawnBoss(){
 }
 
 function onBossDeath(e){
+  if(battleStartTime > 0) bossKillTime = Math.round((performance.now() - battleStartTime) / 1000);
   boss = null;
   if(bossAoe){ if(bossAoe.gfx) projC.removeChild(bossAoe.gfx); bossAoe = null; }
   shake = 26;
@@ -1509,6 +1521,7 @@ function tick(dt){
         }
         if(troopTarget){
           const troopDmg = Math.ceil((1 + waveCount * 0.25) * (1 + (difficulty-1)*0.03));
+          wallDmgAbsorbed += troopDmg;
           troopTarget.hp -= troopDmg;
           updateTroopHP(troopTarget);
           spawnFloat(troopTarget.x, troopTarget.y - 12, '-'+troopDmg, 0xff6644);
@@ -1578,6 +1591,7 @@ function tick(dt){
       if(cd < HEX_SIZE + (e.size||8) + 4 && cd < nearCD){ nearCD=cd; nearCell=c; }
     }
     if(nearCell){
+      if(e.isBoss && bossArrivalHp < 0) bossArrivalHp = baseHP;
       e.attacking = true;
       e.atkTimer = 0;
       const minDist = HEX_SIZE + (e.size||8) + 2;
@@ -2427,6 +2441,7 @@ function tick(dt){
           }
         const nei=enemies.indexOf(nearest);
         if(nearest.hp<=0){
+          interceptCount++;
           if(nei>=0){spawnFloat(nearest.x,nearest.y-12,t.gen?'★'+t.gen.name:'击破',0xffd24a);removeEnemy(nei);}
           // 甘宁「奇袭」：击杀后对最近另一目标造成50%伤害
           if(globalBuffs.ganningChain && t.gen && t.gen.key==='ganning' && enemies.length>0){
@@ -2523,6 +2538,7 @@ function spawnTroop(cell, initialTarget, dmg){
   const troopReflect = cell.general ? (cell.general.reflect || 0) : 0;
   const troop={x:spawnX,y:spawnY,homeX:spawnX,homeY:spawnY,hp,maxHp:hp,dmg,cont,hpFill,size,gen:isGen?gen:null,bt,atkTimer:0,charge:!!(cell.general&&cell.general.charge),srcKey:cell.building,srcName:cell.general?cell.general.name:cell.building,moveSpdMul,reflect:troopReflect,laneIdx};
   updateTroopHP(troop); troops.push(troop);
+  if(troops.length > peakTroopCount) peakTroopCount = troops.length;
 }
 
 function updateTroopHP(t){
@@ -2592,6 +2608,7 @@ function spawnGeneralTroop(cell, initialTarget, dmg){
   cont.x=spawnX; cont.y=spawnY; projC.addChild(cont);
   const troop={x:spawnX,y:spawnY,homeX:spawnX,homeY:spawnY,hp,maxHp:hp,dmg,cont,hpFill,size,gen,bt,atkTimer:0,isGeneralTroop:true,sourceCell:cell,srcKey:cell.building,srcName:gen.name,moveSpdMul:gen.spdMul||1,reflect:gen.reflect||0,laneIdx};
   updateTroopHP(troop); troops.push(troop);
+  if(troops.length > peakTroopCount) peakTroopCount = troops.length;
   spawnFloat(spawnX,spawnY-32,gen.name+' 出征！',0xffd24a);
 }
 
@@ -2616,6 +2633,7 @@ function spawnRallyTroop(cell, dmg){
     isGeneralTroop:isMaxLvl,sourceCell:isMaxLvl?cell:null,srcKey:cell.building,srcName:cell.general?cell.general.name:cell.building,
     moveSpdMul:isMaxLvl&&gen?gen.spdMul||1:1,reflect:isMaxLvl&&gen?gen.reflect||0:0,laneIdx};
   updateTroopHP(troop); troops.push(troop);
+  if(troops.length > peakTroopCount) peakTroopCount = troops.length;
   spawnFloat(cell.px,cell.py-28,'→集结',0x88ddff);
 }
 
@@ -2664,25 +2682,60 @@ function spawnFloat(x,y,txt,hexCol,opts){
   t.anchor.set(0.5); t.x=x; t.y=y; t.life=life; t._maxLife=life; floatC.addChild(t); floats.push(t);
 }
 
-function endGame(){
-  gameOver=true;
+function buildWarReport(isWin, failedWave){
   const elapsed = battleStartTime > 0 ? (performance.now() - battleStartTime) / 1000 : 1;
-  const elapsedStr = elapsed >= 60 ? `${Math.floor(elapsed/60)}分${Math.floor(elapsed%60)}秒` : `${Math.floor(elapsed)}秒`;
+  const elapsedMin = Math.floor(elapsed/60);
+  const elapsedSec = Math.floor(elapsed%60);
+  const elapsedStr = `${elapsedMin}:${String(elapsedSec).padStart(2,'0')}`;
   const total = Object.values(damageStats).reduce((s,v)=>s+v.totalDmg, 0);
   const sorted = Object.entries(damageStats).sort((a,b)=>b[1].totalDmg-a[1].totalDmg);
-  let statsHtml = `<div style="margin-top:8px;width:220px;background:#0a0f14;border:1px solid #1f3040;border-radius:8px;padding:8px 12px;text-align:left">`;
-  statsHtml += `<div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px">战斗统计 &nbsp;<span style="color:#8fa6b2;font-weight:400;">总伤 ${Math.round(total)}</span></div>`;
-  for(const [key, st] of sorted){
-    const pct = total>0?Math.round(st.totalDmg/total*100):0;
+  const lineup = draftPicks.length > 0 ? draftPicks.map(g=>g.name).join(' / ') : '—';
+  const resultStr = isWin ? '<span style="color:#4aff8a">通关✓</span>' : `<span style="color:#ff5555">失败于第${failedWave}波</span>`;
+  const net = Math.round(goldEarned - goldSpent);
+  const netColor = net >= 0 ? '#4aff8a' : '#ff5555';
+  const wallDmgTaken = maxHP - baseHP;
+  const totalAtks = wallDmgAbsorbed + wallDmgTaken;
+  const shieldPct = totalAtks > 0 ? Math.round(wallDmgAbsorbed / totalAtks * 100) : 0;
+  const bossArrPct = bossArrivalHp >= 0 ? Math.round(bossArrivalHp / maxHP * 100) + '%' : '未出现';
+  const bossKillStr = bossKillTime >= 0 ? bossKillTime + '秒' : (bossArrivalHp >= 0 ? '存活' : '—');
+
+  const R = (label, val, color) => `<div style="display:flex;justify-content:space-between;font-size:10.5px;padding:1px 0">
+    <span style="color:#8fa6b2">${label}</span><span style="color:${color||'#d0e8f0'}">${val}</span></div>`;
+
+  let dpsRows = '';
+  for(const [,st] of sorted){
+    const pct = total>0 ? Math.round(st.totalDmg/total*100) : 0;
     const dps2 = Math.round(st.totalDmg/elapsed);
-    statsHtml += `<div style="font-size:11px;color:#b0c8d4;padding:2px 0">${st.name}: ${Math.round(st.totalDmg)} <span style="color:#4affff">(${pct}%)</span> / ${dps2} DPS</div>`;
+    const nameColor = st.name && draftPicks.find(g=>g.name===st.name&&g.category==='advance') ? '#ffb060' : '#4affff';
+    dpsRows += `<div style="font-size:10.5px;color:${nameColor};padding:1px 0">${st.name}  ${Math.round(st.totalDmg)}伤 <span style="color:#ffd24a">(${pct}%)</span> · ${dps2}dps</div>`;
   }
-  statsHtml += `<div style="font-size:11px;color:#8fa6b2;margin-top:4px;padding-top:4px;border-top:1px solid #1a2830">时长 ${elapsedStr} &nbsp;|&nbsp; 收入 <span style="color:#ffd24a">+${Math.round(goldEarned)}G</span> &nbsp;|&nbsp; 消耗 <span style="color:#ff9955">-${Math.round(goldSpent)}G</span></div>`;
-  statsHtml += `</div>`;
+
+  return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
+    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.3 ──</div>
+    ${R('阵容', lineup, '#fff')}
+    <div style="font-size:10.5px;padding:1px 0"><span style="color:#8fa6b2">结果</span> ${resultStr} &nbsp;<span style="color:#8fa6b2">时长</span> <span style="color:#4affff">${elapsedStr}</span> &nbsp;<span style="color:#8fa6b2">翻格</span> <span style="color:#ffd24a">${totalFlips}次</span></div>
+    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
+    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">各将伤害占比</div>
+    ${dpsRows}
+    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
+    <div style="color:#ffb060;font-size:10px;margin-bottom:2px">★ 近战专项</div>
+    <div style="font-size:10.5px;color:#d0e8f0">拦截 <span style="color:#ffd24a">${interceptCount}</span>怪 &nbsp;·&nbsp; 护盾承伤 <span style="color:#ffd24a">${wallDmgAbsorbed}</span> (<span style="color:#ffd24a">${shieldPct}%</span>) &nbsp;·&nbsp; 峰值小兵 <span style="color:#ffd24a">${peakTroopCount}</span></div>
+    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
+    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">经济</div>
+    <div style="font-size:10.5px;color:#d0e8f0">净 <span style="color:${netColor}">${net>=0?'+':''}${net}G</span> &nbsp;·&nbsp; 谷底 <span style="color:#ffd24a">${Math.round(goldFloor)}G</span> &nbsp;·&nbsp; 被迫停翻 <span style="color:${forcedStopFlip?'#ff5555':'#4aff8a'}">${forcedStopFlip?'Y':'N'}</span></div>
+    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
+    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">BOSS</div>
+    <div style="font-size:10.5px;color:#d0e8f0">到达时城墙 <span style="color:#ffd24a">${bossArrPct}</span> &nbsp;·&nbsp; 被杀于 <span style="color:#ffd24a">${bossKillStr}</span></div>
+  </div>`;
+}
+
+function endGame(){
+  gameOver=true;
+  const reportHtml = buildWarReport(false, waveCount);
   const overlay = document.getElementById('gameOverlay');
   overlay.style.display='flex';
   const inner = overlay.querySelector('div');
-  if(inner) inner.innerHTML = `<div class="go-text">基地陷落</div>${statsHtml}<button id="btnRestart2" style="margin-top:10px;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:15px;cursor:pointer;">重开</button>`;
+  if(inner) inner.innerHTML = `<div class="go-text">基地陷落</div>${reportHtml}<button id="btnRestart2" style="margin-top:10px;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:15px;cursor:pointer;">重开</button>`;
   const btn2 = document.getElementById('btnRestart2');
   if(btn2) btn2.onclick=()=>{ readTune(); startGame(); };
 }
@@ -2695,25 +2748,9 @@ function trackDmg(key, name, amt){
 
 function winGame(){
   gameWon=true; gameOver=true;
-  const elapsed = battleStartTime > 0 ? (performance.now() - battleStartTime) / 1000 : 1;
-  const elapsedMin = Math.floor(elapsed / 60);
-  const elapsedSec = Math.floor(elapsed % 60);
-  const elapsedStr = elapsedMin > 0 ? `${elapsedMin}分${elapsedSec}秒` : `${Math.floor(elapsed)}秒`;
-  const total = Object.values(damageStats).reduce((s,v)=>s+v.totalDmg, 0);
-  const sorted = Object.entries(damageStats).sort((a,b)=>b[1].totalDmg-a[1].totalDmg);
-  const dps = total > 0 ? Math.round(total / elapsed) : 0;
-  let html = `<div class="ws-title">DPS 统计 &nbsp;<span style="color:#8fa6b2;font-weight:400;">总伤害 ${Math.round(total)}</span></div>`;
-  for(const [key, st] of sorted){
-    const pct = total>0 ? Math.round(st.totalDmg/total*100) : 0;
-    const dps2 = Math.round(st.totalDmg / elapsed);
-    html += `<div class="ws-row"><span class="ws-name">${st.name}</span><span class="ws-nums">${Math.round(st.totalDmg)} 伤 / ${dps2} DPS <span class="ws-pct">(${pct}%)</span></span></div>`;
-  }
-  html += `<div class="ws-row" style="margin-top:6px;border-top:1px solid #2a3d4a;padding-top:5px"><span class="ws-name">战斗时长</span><span class="ws-nums" style="color:#4affff">${elapsedStr}</span></div>`;
-  html += `<div class="ws-row"><span class="ws-name">金币收入</span><span class="ws-nums" style="color:#ffd24a">+${Math.round(goldEarned)}G</span></div>`;
-  html += `<div class="ws-row"><span class="ws-name">翻格消耗</span><span class="ws-nums" style="color:#ff9955">-${Math.round(goldSpent)}G</span></div>`;
-  html += `<div class="ws-row"><span class="ws-name">净收益</span><span class="ws-nums" style="color:${goldEarned-goldSpent>=0?'#4aff8a':'#ff5555'}">${goldEarned-goldSpent>=0?'+':''}${Math.round(goldEarned-goldSpent)}G</span></div>`;
+  const reportHtml = buildWarReport(true, 0);
   const el = document.getElementById('winStats');
-  if(el) el.innerHTML = html;
+  if(el) el.innerHTML = reportHtml;
   const diffEl=document.getElementById('difficultyEl'); if(diffEl) diffEl.textContent=difficulty;
   document.getElementById('winOverlay').style.display='flex';
   spawnFloat(cx,cy-60,'胜利！撑过15波！',0xffd24a);
