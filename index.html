@@ -377,7 +377,9 @@ function sameHexCell(ax, ay, bx, by) {
 function laneWalkable(q, r) {
   const p = hexToPixel(q, r, cx, cy);
   if (p.y >= LANE_MERGE_Y) return true;
-  return q === -3 || q === 0 || q === 3;
+  // 用 Math.round 容错浮点漂移：亲兵位置q因移动可能偏离整数格，严格===会让全邻格不可走→震荡
+  const qr = Math.round(q);
+  return qr === -3 || qr === 0 || qr === 3;
 }
 // 朝 (gx,gy) 前进的下一格中心：贪心选最朝目标方向的可走邻居；接近目标则直接给目标
 function nextStepCenter(px, py, gx, gy) {
@@ -1125,6 +1127,8 @@ const WAVE_TYPES = [
 ];
 
 function lvlScale(lvl){ return Math.pow(1.7, lvl - 1); }
+function meleeScale(lvl){ return 1 + 0.45 * (lvl - 1); }   // 近战缓增 Lv4=2.35
+function rangedScale(lvl){ return Math.pow(2.0, lvl - 1); } // 远程指数 Lv4=8
 
 function spawnWave(){
   if(gameOver) return;
@@ -1433,9 +1437,11 @@ function tick(dt){
     // 已到达城墙，持续攻击（蔚蓝模式）
     if(e.attacking){
       // Bug-2 fix: 吕布击退越墙保护——敌人被推入基地核心区时强制重置回ring1外侧
-      if(e.y > cy - HEX_ROW){
+      // Bug-7 fix: 被击退出屏幕上方时同样重置攻击态，让敌人恢复移动
+      if(e.y > cy - HEX_ROW || e.y < -HEX_SIZE * 3){
         e.attacking = false;
-        e.y = Math.min(e.y, cy - HEX_ROW - HEX_SIZE);
+        e.y = Math.min(e.y, cy - HEX_ROW - HEX_SIZE); // 越墙：压回墙外沿
+        e.y = Math.max(e.y, -HEX_SIZE * 2);            // 越顶：压回屏幕入口
         e.cont.x = e.x; e.cont.y = e.y;
         // fall through to movement code below
       } else {
@@ -1444,10 +1450,28 @@ function tick(dt){
       const atkInterval = (globalBuffs.tauntAtkSlow_caoren && e._taunted) ? 3333 : 2000; // 曹仁镇慑：攻速-40%
       if(e.atkTimer >= atkInterval){
         e.atkTimer = 0;
-        baseHP -= Math.ceil((1 + waveCount * 0.25) * (1 + (difficulty-1)*0.03));
-        shake=2; wallFlash=6;
-        if(baseHP<=0){ baseHP=0; endGame(); }
-        updateHUD();
+        // GAP3: 攻击范围内有近战亲兵时优先打兵（护盾层）
+        let troopTarget = null, minTD = Infinity;
+        for(const tr of troops){
+          if(!tr.bt || tr.bt.key !== 'advance') continue;
+          const td = Math.hypot(tr.x - e.x, tr.y - e.y);
+          if(td < HEX_SIZE * 2.5 && td < minTD){ minTD = td; troopTarget = tr; }
+        }
+        if(troopTarget){
+          const troopDmg = Math.ceil((1 + waveCount * 0.25) * (1 + (difficulty-1)*0.03));
+          troopTarget.hp -= troopDmg;
+          updateTroopHP(troopTarget);
+          spawnFloat(troopTarget.x, troopTarget.y - 12, '-'+troopDmg, 0xff6644);
+          if(troopTarget.hp <= 0){
+            const ti = troops.indexOf(troopTarget);
+            if(ti >= 0){ spawnFloat(troopTarget.x, troopTarget.y - 18, '阵亡', 0xff4444); removeTroop(ti); }
+          }
+        } else {
+          baseHP -= Math.ceil((1 + waveCount * 0.25) * (1 + (difficulty-1)*0.03));
+          shake=2; wallFlash=6;
+          if(baseHP<=0){ baseHP=0; endGame(); }
+          updateHUD();
+        }
       }
       continue;
       } // end else (normal attacking)
@@ -1466,6 +1490,14 @@ function tick(dt){
     // 近战亲兵攻击吸引仇恨：受击后跟随目标亲兵2.5秒
     if(!taunted && e.aggroTroop && now < e.aggroUntil && troops.indexOf(e.aggroTroop)>=0){
       moveX = e.aggroTroop.x; moveY = e.aggroTroop.y; taunted = true;
+    }
+    // 普通近战亲兵：1格常驻软仇恨（非曹仁专属嘲讽，弱吸引，无视觉标记）
+    if(!taunted){
+      for(const tr of troops){
+        if(tr.bt && tr.bt.key==='advance' && tr.srcName!=='曹仁'){
+          if(hexDistance(e.x,e.y,tr.x,tr.y)<=1){ moveX=tr.x; moveY=tr.y; taunted=true; break; }
+        }
+      }
     }
 
     if(taunted){
@@ -1619,7 +1651,7 @@ function tick(dt){
     if(cell.state!=='revealed' || !cell.general || cell.general.key!=='dianwei') continue;
     const bt=B_TYPES.find(b=>b.key===cell.category);
     const burnDpsMul = globalBuffs.burnDpsMul_dianwei || 1;
-    const burnDps = bt ? bt.dps * lvlScale(cell.lvl) * cell.general.dpsMul * (globalBuffs.globalDmg||1) * 0.3 * burnDpsMul : 0;
+    const burnDps = bt ? bt.dps * meleeScale(cell.lvl) * cell.general.dpsMul * (globalBuffs.globalDmg||1) * 0.3 * burnDpsMul : 0;
     const burnPerTick = burnDps * (app.ticker.deltaMS / 1000);
     const burnRMul = globalBuffs.burnRadiusMul_dianwei || 1;
     const burnR = HEX_SIZE * 2 * burnRMul;
@@ -1720,7 +1752,7 @@ function tick(dt){
       const strikeX=HEX_COL*sqQ+cx, strikeY=HEX_ROW*(sqR2+sqQ*0.5)+cy;
       const expanded=globalBuffs.stormExpand_simayi;
       const strikeR=expanded?HEX_ROW:HEX_SIZE;
-      const dmg=bt.dps*lvlScale(cell.lvl)*cell.general.dpsMul*(globalBuffs.globalDmg||1)*0.6;
+      const dmg=bt.dps*rangedScale(cell.lvl)*cell.general.dpsMul*(globalBuffs.globalDmg||1)*0.6;
       // 落雷瞬间伤害
       for(let i=enemies.length-1;i>=0;i--){
         const e=enemies[i];
@@ -1787,7 +1819,7 @@ function tick(dt){
       if(isGeneral && !cell.generalOut){ continue outerCells; }
       if(troops.length<40){
         const dpsMul=isGeneral?gen.dpsMul:1,dmgMul=globalBuffs.globalDmg||1;
-        const dmg=bt.dps*lvlScale(cell.lvl)*dpsMul*dmgMul;
+        const dmg=bt.dps*meleeScale(cell.lvl)*dpsMul*dmgMul;
         // Lv1→1兵, Lv2→2兵, Lv3→3兵; Lv4：gen.multishot||1（甘宁3路，其他1）
         const spawnCount = isGeneral ? (gen.multishot||1) : Math.min(cell.lvl, 3);
         if(target){
@@ -1809,7 +1841,7 @@ function tick(dt){
       attackTimers[ck]=now;
       const dpsMul = isGeneral ? gen.dpsMul : 1;
       const dmgMul = globalBuffs.globalDmg || 1;
-      let dmg = bt.dps * lvlScale(cell.lvl) * dpsMul * dmgMul;
+      let dmg = bt.dps * (cell.category === 'advance' ? meleeScale(cell.lvl) : rangedScale(cell.lvl)) * dpsMul * dmgMul;
       const shots = (isGeneral && gen.multishot) ? gen.multishot : 1;
 
       if(cell.category === 'advance'){
@@ -2092,7 +2124,7 @@ function tick(dt){
       cell.generalOut = true;
       const bt=B_TYPES.find(b=>b.key===cell.category);
       const dpsMul = gen.dpsMul;
-      const dmg = bt.dps * lvlScale(cell.lvl) * dpsMul * (globalBuffs.globalDmg||1);
+      const dmg = bt.dps * meleeScale(cell.lvl) * dpsMul * (globalBuffs.globalDmg||1);
       let tgt=null, minD=Infinity, btg=null, btd=Infinity;
       for(const e of enemies){ const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2); if(e.isBoss){ if(d<btd){btd=d;btg=e;} } else if(d<minD){minD=d;tgt=e;} }
       if(!tgt) tgt=btg; // boss兜底
@@ -2330,7 +2362,7 @@ function tick(dt){
               if(cross<pierceW && dot>0 && dot<chgLen+HEX_SIZE*2){
                 pe.hp-=pierceDmg; spawnFloat(pe.x,pe.y-10,Math.round(pierceDmg)+'',0xff6633);
                 trackDmg(t.srcKey,t.srcName,pierceDmg);
-                if(globalBuffs.chargeKnockback_lubu){
+                if(globalBuffs.chargeKnockback_lubu && !pe.isBoss){
                   pe.x+=chgNX*HEX_SIZE*0.8; pe.y+=Math.min(chgNY,0)*HEX_SIZE*0.8;
                   if(pe.cont){ pe.cont.x=pe.x; pe.cont.y=pe.y; }
                 }
@@ -2426,7 +2458,7 @@ function spawnTroop(cell, initialTarget, dmg){
   const bt=B_TYPES.find(b=>b.key===cell.category);
   const gen=cell.general; const isGen=cell.lvl>=TUNE.maxLvl&&gen;
   const dpsMul=isGen?gen.dpsMul:1;
-  const hp=bt.dps*lvlScale(cell.lvl)*dpsMul*2.5;
+  const hp=bt.dps*meleeScale(cell.lvl)*dpsMul*2.5;
   const size=isGen?(gen.projSize||6):5;
   // 从城外生成，不在建筑格内出现
   const _cqT=Math.round((cell.px - cx) / HEX_COL);
@@ -2497,7 +2529,7 @@ function spawnGeneralTroop(cell, initialTarget, dmg){
   const bt=B_TYPES.find(b=>b.key===cell.category);
   const gen=cell.general;
   const size=(gen.projSize||6)+2;
-  const hp=bt.dps*lvlScale(cell.lvl)*gen.dpsMul*2.5*2;
+  const hp=bt.dps*meleeScale(cell.lvl)*gen.dpsMul*2.5*2;
   // 武将从城外生成
   const _cqG=Math.round((cell.px - cx) / HEX_COL);
   const laneIdx=_cqG < 0 ? 0 : _cqG > 0 ? 2 : 1;
@@ -2523,7 +2555,7 @@ function spawnRallyTroop(cell, dmg){
   const bt=B_TYPES.find(b=>b.key===cell.category);
   const gen=cell.general; const isMaxLvl=cell.lvl>=TUNE.maxLvl&&gen;
   const size=isMaxLvl?(gen.projSize||6)+2:5;
-  const hp=bt.dps*lvlScale(cell.lvl)*(isMaxLvl&&gen?gen.dpsMul:1)*2.5*(isMaxLvl?2:1);
+  const hp=bt.dps*meleeScale(cell.lvl)*(isMaxLvl&&gen?gen.dpsMul:1)*2.5*(isMaxLvl?2:1);
   const cont=new PIXI.Container();
   const body=new PIXI.Graphics(); body.beginFill(isMaxLvl?0xffd24a:bt.hex,0.65); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
   const ring=new PIXI.Graphics(); ring.lineStyle(1.5,0x88ddff,0.7); ring.drawCircle(0,0,size+2); cont.addChild(ring);
