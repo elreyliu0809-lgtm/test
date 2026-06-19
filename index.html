@@ -185,7 +185,6 @@ const TUNE = {
   baseHP: 500,
   unlockCount: 4,
   flipCdMs: 800,   // 仅防误触（P4：金币取代CD作为节流机制）
-  initFreeFlips: 0, // 已废弃，初始100G本身覆盖前3次翻格
   goldMul: 1.0,  // 金币掉落全局倍率（playtest 调参用）
 };
 
@@ -453,6 +452,17 @@ function hexCorners(size) {
   return c;
 }
 
+// 半径 R 格的六边形圆盘：返回各格相对中心格的【像素偏移】(dx,dy)，含中心(0,0)。
+// 用于"以某格为中心铺满 N 圈"的范围视觉——配合 gfx.x/gfx.y 定位到中心格即可。
+// 命中判定请直接用 hexDistance(centerX,centerY,e.x,e.y) <= R，与本视觉一一对应。
+function hexDiskOffsets(R) {
+  const out = [];
+  for (let dq=-R; dq<=R; dq++)
+    for (let dr=Math.max(-R,-dq-R); dr<=Math.min(R,-dq+R); dr++)
+      out.push({ dx: HEX_COL*dq, dy: HEX_ROW*(dr+dq*0.5) });
+  return out;
+}
+
 // ===== 全局状态 =====
 let app, worldC, enemyC, projC, floatC, bgHexC;
 let W, H, cx, cy;
@@ -472,7 +482,6 @@ let waveCount = 0;
 let eliteLaneCycle = 0; // 精英路循环计数器（0=左 1=中 2=右，逐波推进）
 let gameOver = false;
 let shake = 0;
-let flipCooldown = 0; // 翻格冷却计时器(ms)
 let wallGfx = null; // 城墙图形对象
 // ===== 横向滚动 =====
 let wallFlash = 0; // 城墙受击闪红计时
@@ -485,6 +494,8 @@ let damageStats = {}; // { genKey: { totalDmg, name } }
 let battleStartTime = 0;
 
 let selectedCell = null;
+let rangeOverlayGfx = null;   // 选中塔时显示的"射程格"覆盖层
+let rangeOverlayCell = null;  // 当前正在显示射程的格（用于点击同格切换关闭）
 let mergeMode = false;
 let globalBuffs = {};
 let pendingPick = null; // { type:'general'|'buff', cell?, options:[], resolve? }
@@ -501,6 +512,9 @@ let wallRegenTimer = 0; // 少年·城墙修复计时器
 let TROOP_Y_FLOOR = 0; // 士兵活动Y轴下限（城外交战线）
 // 三路：上方用障碍物分割左/中/右，敌人沿各自路推进，逼近领地后汇聚
 let LANES = [], LANE_MERGE_Y = 0, LANE_BOUNDS = [];
+let attackTimers = {};
+let _waveTimerEl = null, _waveCountEl = null;
+let baseCellRef = null;
 
 // ===== 音效 =====
 let audioCtx = null;
@@ -565,6 +579,8 @@ function boot(){
   document.getElementById('btnRestart3').onclick=()=>{ readTune(); startGame(); };
   document.getElementById('btnNextDiff').onclick=()=>{ difficulty++; readTune(); startGame(); };
   document.getElementById('mergeHint').onclick=()=>cancelMerge();
+  _waveTimerEl = document.getElementById('waveTimerEl');
+  _waveCountEl = document.getElementById('waveCountEl');
 }
 
 function startGame(){
@@ -573,10 +589,10 @@ function startGame(){
   baseHP=TUNE.baseHP; maxHP=TUNE.baseHP;
   baseLvl=1; totalFlips=0; waveCount=0; eliteLaneCycle=0;
   waveTimer=0; gameOver=false; gameWon=false; shake=0;
-  flipCooldown=0; wallFlash=0;
+  wallFlash=0;
   gold=START_GOLD; goldTrickleTimer=0; goldSpent=0; goldEarned=START_GOLD;
   damageStats={}; battleStartTime=0;
-  selectedCell=null; mergeMode=false;
+  selectedCell=null; mergeMode=false; rangeOverlayGfx=null; rangeOverlayCell=null;
   globalBuffs={}; pendingPick=null; draftPicks=[];
   troops=[]; attackTimers={}; boss=null; bossAoe=null; bossChest=null; fireZones=[]; stormZones=[]; wallRegenTimer=0;
   shaoNianAtk={ timer:0, targets:1, dmgMul:1, rangeMul:1, spdMul:1 };
@@ -680,6 +696,7 @@ function buildHexGrid(){
     worldC.addChild(cont);
   }
 
+  baseCellRef = hexCells.find(c => c.state === 'base');
   // 城墙：包裹已揭示/可翻区域的弧线
   wallGfx = new PIXI.Graphics();
   drawWall();
@@ -824,6 +841,33 @@ function drawCell(cell){
   }
 }
 
+// ===== 塔射程（格）：判定与显示的唯一来源，保证"画几格=打几格" =====
+function towerRangeHex(cell){
+  const bt=B_TYPES.find(b=>b.key===cell.category); if(!bt) return 1;
+  const gen=cell.general, isGen=cell.lvl>=TUNE.maxLvl&&gen;
+  const rangeMul=(isGen?gen.rangeMul:1)*(globalBuffs.globalRange||1);
+  let range=bt.range*HEX_SIZE*2.2*rangeMul;
+  if(cell.category!=='advance') range=Math.min(range,RANGED_RANGE_CAP);
+  return Math.max(1, Math.round(range/HEX_ROW));
+}
+// 选中塔时把可攻击的六边形格高亮出来（显性传达射程＝N 格）
+function drawTowerRange(cell){
+  clearTowerRange();
+  const bt=B_TYPES.find(b=>b.key===cell.category); if(!bt) return;
+  const R=towerRangeHex(cell);
+  const g=new PIXI.Graphics(); projC.addChild(g); rangeOverlayGfx=g; rangeOverlayCell=cell;
+  for(const o of hexDiskOffsets(R)){
+    if(o.dx===0&&o.dy===0) continue;          // 中心格＝塔本身，不描边
+    const hx=cell.px+o.dx, hy=cell.py+o.dy;
+    g.beginFill(bt.hex,0.06); g.drawPolygon(hexPoly(hx,hy,HEX_SIZE-2)); g.endFill();
+    g.lineStyle(1.5,bt.hex,0.45); g.drawPolygon(hexPoly(hx,hy,HEX_SIZE-2)); g.lineStyle(0);
+  }
+}
+function clearTowerRange(){
+  if(rangeOverlayGfx){ if(rangeOverlayGfx.parent) rangeOverlayGfx.parent.removeChild(rangeOverlayGfx); rangeOverlayGfx=null; }
+  rangeOverlayCell=null;
+}
+
 // ===== 点击逻辑 =====
 function onCellClick(cell){
   if(gameOver || pendingPick) return;
@@ -837,6 +881,10 @@ function onCellClick(cell){
     cancelMerge(); return;
   }
 
+  // 非合成路径：先记录并清掉已有的射程预览（点击别处＝收起）
+  const prevRangeCell = rangeOverlayCell;
+  clearTowerRange();
+
   if(cell.state==='flippable' || cell.state==='empty'){
     const _np = FLIP_PRICES[Math.min(totalFlips, FLIP_PRICES.length-1)];
     if(gold < _np){
@@ -846,13 +894,17 @@ function onCellClick(cell){
     }
     flipCell(cell);
   } else if(cell.state==='revealed' && cell.lvl<TUNE.maxLvl){
-    startMerge(cell);
+    startMerge(cell);   // 内部会画该塔的射程格
+  } else if(cell.state==='revealed'){
+    // 满级武将塔不可合成：点击切换射程预览（再点一次收起）
+    if(prevRangeCell!==cell) drawTowerRange(cell);
   }
 }
 
 function startMerge(cell){
   selectedCell=cell; mergeMode=true;
   drawCell(cell);
+  drawTowerRange(cell);   // 选中即显示该塔射程格
   document.getElementById('mergeHint').style.display='block';
   for(const c of hexCells){
     if(c===cell) continue;
@@ -869,6 +921,7 @@ function startMerge(cell){
 function cancelMerge(){
   if(selectedCell) drawCell(selectedCell);
   selectedCell=null; mergeMode=false;
+  clearTowerRange();
   document.getElementById('mergeHint').style.display='none';
   for(const c of hexCells){
     const hl=c.cont.getChildByName('mergeHL');
@@ -1326,7 +1379,6 @@ function removeEnemy(idx){
 }
 
 // ===== 战斗 tick =====
-let attackTimers = {};
 
 function tick(dt){
   if(gameOver || pendingPick) return;
@@ -1384,12 +1436,10 @@ function tick(dt){
   if(waveTimer>=_curWaveMs && !inDraft){ waveTimer=0; spawnWave(); }
   // 胜利判断：15波全部发完 + 场上无残敌
   if(waveCount > 15 && enemies.length === 0){ winGame(); return; }
-  const wtimerEl=document.getElementById('waveTimerEl');
-  if(wtimerEl) wtimerEl.textContent = waveCount>15 ? '清场中' : Math.max(0,Math.ceil((_curWaveMs-waveTimer)/1000))+'s';
-  const wcountEl=document.getElementById('waveCountEl');
-  if(wcountEl){
-    if(boss){ wcountEl.textContent=(waveCount>15?15:waveCount)+'/15 ⚠BOSS'; wcountEl.style.color='#ff5a5a'; }
-    else { wcountEl.textContent = waveCount>15 ? '15/15 ✓' : waveCount+'/15'; wcountEl.style.color=''; }
+  if(_waveTimerEl) _waveTimerEl.textContent = waveCount>15 ? '清场中' : Math.max(0,Math.ceil((_curWaveMs-waveTimer)/1000))+'s';
+  if(_waveCountEl){
+    if(boss){ _waveCountEl.textContent=(waveCount>15?15:waveCount)+'/15 ⚠BOSS'; _waveCountEl.style.color='#ff5a5a'; }
+    else { _waveCountEl.textContent = waveCount>15 ? '15/15 ✓' : waveCount+'/15'; _waveCountEl.style.color=''; }
   }
 
   const now=performance.now();
@@ -1605,25 +1655,33 @@ function tick(dt){
     const g=bossAoe.gfx; g.clear();
     bossAoe.timer += app.ticker.deltaMS;
     const dirA = Math.PI/2; // 朝下=基地方向
+    const Rhex = 2;         // 震地锥纵深=2 圈格
+    // 锥内格：朝基地方向 ±60° 的 1~2 圈格 —— 显示与判定共用同一集合
+    const coneCells = boss ? hexDiskOffsets(Rhex).filter(o=>{
+      if(o.dx===0&&o.dy===0) return false;
+      let diff=Math.abs(Math.atan2(o.dy,o.dx)-dirA); if(diff>Math.PI) diff=2*Math.PI-diff;
+      return diff <= bossAoe.half;
+    }) : [];
     if(!boss){ projC.removeChild(g); bossAoe=null; }   // boss已死，清掉残留
     else if(bossAoe.phase==='warn'){
-      // 蓄力 0.8s：朝基地方向的扇形锥逐渐充能，提示影响范围
+      // 蓄力 0.8s：逐格点亮朝基地方向的震地格，提示影响范围
       const p = Math.min(1, bossAoe.timer/800);
-      const a0=dirA-bossAoe.half, a1=dirA+bossAoe.half;
-      g.lineStyle(3, 0xffa500, 0.5+0.4*Math.abs(Math.sin(bossAoe.timer/80)));
-      g.moveTo(boss.x, boss.y); g.arc(boss.x, boss.y, bossAoe.radius, a0, a1); g.lineTo(boss.x, boss.y);
-      g.beginFill(0xffa500, 0.14*p);
-      g.moveTo(boss.x, boss.y); g.arc(boss.x, boss.y, bossAoe.radius*p, a0, a1); g.lineTo(boss.x, boss.y); g.endFill();
+      const fa = (0.10+0.18*p) * (0.6+0.4*Math.abs(Math.sin(bossAoe.timer/80)));
+      for(const o of coneCells){
+        const hx=boss.x+o.dx, hy=boss.y+o.dy;
+        g.beginFill(0xffa500, fa); g.drawPolygon(hexPoly(hx,hy,HEX_SIZE-2)); g.endFill();
+        g.lineStyle(2, 0xffcc55, 0.5+0.4*p); g.drawPolygon(hexPoly(hx,hy,HEX_SIZE-2)); g.lineStyle(0);
+      }
       if(bossAoe.timer >= 800){
         bossAoe.phase='blast'; bossAoe.timer=0;
         blip(150,0.4,'square',0.22); shake=Math.max(shake,9);
-        // 爆发：锥内按距离近的优先，最多击退 cap 个亲兵/士兵（不死亡只打断）
+        // 爆发：锥内格按格距离近的优先，最多击退 cap 个亲兵/士兵（不死亡只打断）
         const inCone = [];
         for(const t of troops){
-          const dx=t.x-boss.x, dy=t.y-boss.y; const d=Math.sqrt(dx*dx+dy*dy);
-          if(d > bossAoe.radius) continue;
-          let diff=Math.abs(Math.atan2(dy,dx)-dirA); if(diff>Math.PI) diff=2*Math.PI-diff;
-          if(diff <= bossAoe.half) inCone.push({t,d});
+          const hd=hexDistance(boss.x,boss.y,t.x,t.y);
+          if(hd<1 || hd>Rhex) continue;
+          let diff=Math.abs(Math.atan2(t.y-boss.y,t.x-boss.x)-dirA); if(diff>Math.PI) diff=2*Math.PI-diff;
+          if(diff <= bossAoe.half) inCone.push({t,d:hd});
         }
         inCone.sort((a,b)=>a.d-b.d);
         for(let k=0;k<Math.min(bossAoe.cap,inCone.length);k++){
@@ -1637,11 +1695,12 @@ function tick(dt){
         }
       }
     } else {
-      // 爆发余波 ~0.35s：锥形亮边向外扩散
+      // 爆发余波 ~0.35s：锥内格亮闪后渐隐
       const p = Math.min(1, bossAoe.timer/350);
-      const a0=dirA-bossAoe.half, a1=dirA+bossAoe.half;
-      g.lineStyle(5*(1-p)+1, 0xfff0c0, 0.95*(1-p));
-      g.moveTo(boss.x, boss.y); g.arc(boss.x, boss.y, bossAoe.radius*(0.55+0.7*p), a0, a1); g.lineTo(boss.x, boss.y);
+      g.lineStyle(0);
+      for(const o of coneCells){
+        g.beginFill(0xfff0c0, 0.5*(1-p)); g.drawPolygon(hexPoly(boss.x+o.dx, boss.y+o.dy, HEX_SIZE-2)); g.endFill();
+      }
       if(bossAoe.timer >= 350){ projC.removeChild(g); bossAoe=null; }
     }
   }
@@ -1654,11 +1713,10 @@ function tick(dt){
     const burnDps = bt ? bt.dps * meleeScale(cell.lvl) * cell.general.dpsMul * (globalBuffs.globalDmg||1) * 0.3 * burnDpsMul : 0;
     const burnPerTick = burnDps * (app.ticker.deltaMS / 1000);
     const burnRMul = globalBuffs.burnRadiusMul_dianwei || 1;
-    const burnR = HEX_SIZE * 2 * burnRMul;
+    const burnRHex = Math.max(1, Math.round(HEX_SIZE * 2 * burnRMul / HEX_ROW));
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
-      const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2);
-      if(d < burnR){
+      if(hexDistance(cell.px,cell.py,e.x,e.y) <= burnRHex){
         e.hp -= burnPerTick;
         trackDmg(cell.general.key, cell.general.name, burnPerTick);
         if(!e._burnVfx || now - e._burnVfx > 500){
@@ -1695,8 +1753,7 @@ function tick(dt){
     const fzDmg = fz.dps * (app.ticker.deltaMS/1000);
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
-      const fd=Math.sqrt((e.x-fz.x)**2+(e.y-fz.y)**2);
-      if(fd<fz.r){
+      if(sameHexCell(e.x,e.y,fz.x,fz.y)){
         e.hp-=fzDmg; e.slowFactor=fz.slowFactor||0.6; e.slowUntil=now+500;
         if(e.hp<=0){spawnFloat(e.x,e.y-12,'燃地杀',0xff5500);removeEnemy(i);}
         else{updateEnemyHP(e);}
@@ -1723,7 +1780,7 @@ function tick(dt){
     const szDmg=sz.dps*(app.ticker.deltaMS/1000);
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
-      if(Math.sqrt((e.x-sz.x)**2+(e.y-sz.y)**2)<sz.r){
+      if(hexDistance(sz.x,sz.y,e.x,e.y)<=sz.Rhex){
         e.hp-=szDmg; trackDmg('simayi','司马懿',szDmg);
         if(e.hp<=0){spawnFloat(e.x,e.y-12,'⚡',0x88aaff);removeEnemy(i);}else{updateEnemyHP(e);}
       }
@@ -1744,19 +1801,19 @@ function tick(dt){
     cell._stormTimer=(cell._stormTimer||0)+app.ticker.deltaMS;
     if(cell._stormTimer>=stormInterval){
       cell._stormTimer-=stormInterval;
-      const sRange=bt.range*HEX_SIZE*2.2*(cell.general.rangeMul||1)*(globalBuffs.globalRange||1);
+      const sRangeHex=towerRangeHex(cell);
       let stgt=null, sD=Infinity;
-      for(const e of enemies){ const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2); if(d<sRange&&d<sD){sD=d;stgt=e;} }
+      for(const e of enemies){ const d=hexDistance(cell.px,cell.py,e.x,e.y); if(d<=sRangeHex&&d<sD){sD=d;stgt=e;} }
       if(!stgt) continue;
       const sqQ=Math.round((stgt.x-cx)/HEX_COL), sqR2=Math.round((stgt.y-cy)/HEX_ROW-sqQ*0.5);
       const strikeX=HEX_COL*sqQ+cx, strikeY=HEX_ROW*(sqR2+sqQ*0.5)+cy;
       const expanded=globalBuffs.stormExpand_simayi;
-      const strikeR=expanded?HEX_ROW:HEX_SIZE;
+      const strikeRHex=expanded?1:0;   // 基础=落点格本身，强化=1 圈
       const dmg=bt.dps*rangedScale(cell.lvl)*cell.general.dpsMul*(globalBuffs.globalDmg||1)*0.6;
-      // 落雷瞬间伤害
+      // 落雷瞬间伤害（落点格 / 1圈）
       for(let i=enemies.length-1;i>=0;i--){
         const e=enemies[i];
-        if(Math.sqrt((e.x-strikeX)**2+(e.y-strikeY)**2)<strikeR){
+        if(hexDistance(strikeX,strikeY,e.x,e.y)<=strikeRHex){
           e.hp-=dmg; trackDmg('simayi','司马懿',dmg);
           if(e.hp<=0){spawnFloat(e.x,e.y-12,'⚡天命',0x88aaff);removeEnemy(i);}else{updateEnemyHP(e);}
         }
@@ -1774,10 +1831,10 @@ function tick(dt){
       // 创建持续雷暴区（持续时间=攻击间隔）
       const szGfx=new PIXI.Graphics(); szGfx.x=strikeX; szGfx.y=strikeY; projC.addChild(szGfx);
       const zoneDps=dmg/stormInterval*800; // 间隔内总伤≈落雷的0.8倍
-      stormZones.push({ x:strikeX, y:strikeY, r:strikeR, life:stormInterval, maxLife:stormInterval, gfx:szGfx, dps:zoneDps, expanded:expanded, srcCell:cell });
+      stormZones.push({ x:strikeX, y:strikeY, Rhex:strikeRHex, life:stormInterval, maxLife:stormInterval, gfx:szGfx, dps:zoneDps, expanded:expanded, srcCell:cell });
       // 落雷连接线（快速闪现）
       const boltL=new PIXI.Graphics(); boltL.lineStyle(2,0x88aaff,0.8); boltL.moveTo(cell.px,cell.py); boltL.lineTo(strikeX,strikeY); projC.addChild(boltL);
-      let bltT=0; const animBlt=()=>{ bltT+=16; boltL.alpha=Math.max(0,1-bltT/300); if(bltT<300) requestAnimationFrame(animBlt); else projC.removeChild(boltL); }; requestAnimationFrame(animBlt);
+      addFadeAnim(projC, boltL, 300);
     }
   }
 
@@ -1795,15 +1852,13 @@ function tick(dt){
     const atkInterval = cell.category==='advance' ? Math.max(3000, 6000 - cell.lvl*1000) : 1100 / ((1 + cell.lvl*0.7) * spdMul);
     if(now-cd < atkInterval) continue;
 
-    const rangeMul = (isGeneral ? gen.rangeMul : 1) * (globalBuffs.globalRange || 1);
-    let range = bt.range * HEX_SIZE * 2.2 * rangeMul;
-    if(cell.category!=='advance') range = Math.min(range, RANGED_RANGE_CAP);  // B案：远程射程封顶
+    const rangeHex = towerRangeHex(cell);   // 射程＝整数格，与选中时显示的射程格完全一致
     // A案角色分工：远程单体将打最远(后排狙击)，近战/连锁将(庞统周瑜)保持最近(护前线/不破坏连锁)
     const wantFar = (cell.category!=='advance') && !(isGeneral && gen.chain);
     let target=null, pickD=wantFar?-Infinity:Infinity, bossT=null, bossD=Infinity;
     for(const e of enemies){
-      const d=Math.sqrt((e.x-cell.px)**2+(e.y-cell.py)**2);
-      if(d>=range) continue;
+      const d=hexDistance(cell.px,cell.py,e.x,e.y);   // 六边形格距离
+      if(d>rangeHex) continue;
       if(e.isBoss){ if(d<bossD){ bossD=d; bossT=e; } }      // boss降级为兜底目标
       else if(wantFar ? d>pickD : d<pickD){ pickD=d; target=e; }
     }
@@ -1844,15 +1899,6 @@ function tick(dt){
       let dmg = bt.dps * (cell.category === 'advance' ? meleeScale(cell.lvl) : rangedScale(cell.lvl)) * dpsMul * dmgMul;
       const shots = (isGeneral && gen.multishot) ? gen.multishot : 1;
 
-      if(cell.category === 'advance'){
-        // 进攻：出兵
-        if(troops.length>=40) break outerCells;
-        for(let s=0; s<shots; s++){
-          const tgt = s===0 ? target : (enemies[Math.floor(Math.random()*enemies.length)] || target);
-          if(!tgt) break;
-          spawnTroop(cell, tgt, dmg);
-        }
-      } else {
         // 防守：站桩即时伤害 + 投射物视觉
         const projColor = isGeneral ? 0xffd24a : bt.hex;
         const projSize = isGeneral ? gen.projSize : 3;
@@ -1901,8 +1947,7 @@ function tick(dt){
             let pierceDmg = finalDmg; let hit = 0;
             for(const pe of sortedByDist){
               if(hit >= pierceCount+1) break;
-              const pd = Math.sqrt((pe.x-cell.px)**2+(pe.y-cell.py)**2);
-              if(pd > range) break;
+              if(hexDistance(cell.px,cell.py,pe.x,pe.y) > rangeHex) break;
               pe.hp -= pierceDmg;
               trackDmg(cell.building, gen&&gen.name, pierceDmg);
               spawnArrowProjectile(cell.px, cell.py, pe.x, pe.y, 0xffdd44, projSize, mingdiMaxLife);
@@ -1930,13 +1975,19 @@ function tick(dt){
               const frostG=new PIXI.Graphics(); frostG.x=fhc.x; frostG.y=fhc.y; projC.addChild(frostG);
               frostG.beginFill(0x66ccff,0.30); frostG.drawPolygon(hexCorners(HEX_SIZE-2)); frostG.endFill();
               frostG.lineStyle(2,0xaaeeff,0.9); frostG.drawPolygon(hexCorners(HEX_SIZE-2));
-              let _ft=0; const _animFrost=()=>{ _ft+=16; frostG.alpha=Math.max(0,1-_ft/280); if(_ft<280) requestAnimationFrame(_animFrost); else if(projC.children.indexOf(frostG)>=0) projC.removeChild(frostG); }; requestAnimationFrame(_animFrost);
+              addFadeAnim(projC, frostG, 280);
             }
             if(globalBuffs.slowAoe_zhugeliang && isZhuge){
-              const slowR = HEX_SIZE;
+              const slowRHex = 1;   // 减速AOE：以目标格为中心 1 圈
+              // 显性范围视觉：高亮波及的六边形格（与判定范围一致）
+              const _sg=new PIXI.Graphics(); _sg.x=tgt.x; _sg.y=tgt.y; projC.addChild(_sg);
+              for(const o of hexDiskOffsets(slowRHex)){
+                _sg.beginFill(0x66ccff,0.14); _sg.drawPolygon(hexPoly(o.dx,o.dy,HEX_SIZE-2)); _sg.endFill();
+                _sg.lineStyle(1.5,0xaaeeff,0.6); _sg.drawPolygon(hexPoly(o.dx,o.dy,HEX_SIZE-2)); _sg.lineStyle(0);
+              }
+              addFadeAnim(projC,_sg,280);
               for(const se of enemies){
-                const sd = Math.sqrt((se.x-tgt.x)**2+(se.y-tgt.y)**2);
-                if(sd < slowR){ se.slowFactor=slowVal; se.slowUntil=now+2000;
+                if(hexDistance(tgt.x,tgt.y,se.x,se.y) <= slowRHex){ se.slowFactor=slowVal; se.slowUntil=now+2000;
                   se.poisonUntil=now+2000; se.poisonDps=poisonDps; se._poisonTimer=0; }
               }
               spawnFloat(tgt.x, tgt.y-14, '❄☠AOE', 0x88ccff);
@@ -1952,10 +2003,9 @@ function tick(dt){
             tgt.stunUntil=now+500;
             spawnFloat(tgt.x,tgt.y-18,'💫晕',0xffffff);
             if(globalBuffs.stunSpread_xuchu){
-              const spreadR=HEX_SIZE*2.5;
+              const spreadRHex=2;
               for(const se of enemies){ if(se===tgt) continue;
-                const sd=Math.sqrt((se.x-tgt.x)**2+(se.y-tgt.y)**2);
-                if(sd<spreadR&&Math.random()<0.3){ se.stunUntil=now+1000; spawnFloat(se.x,se.y-14,'💫扩散',0xddddff); }
+                if(hexDistance(tgt.x,tgt.y,se.x,se.y)<=spreadRHex&&Math.random()<0.3){ se.stunUntil=now+1000; spawnFloat(se.x,se.y-14,'💫扩散',0xddddff); }
               }
             }
           }
@@ -1966,7 +2016,7 @@ function tick(dt){
             const aoeDmg=finalDmg*0.5, aoeR=HEX_SIZE*2*aoeRMul;
             // AOE爆炸圆圈视觉
             const _ag=new PIXI.Graphics(); _ag.lineStyle(4,0xff5533,0.9); _ag.drawCircle(0,0,aoeR); _ag.x=tgt.x; _ag.y=tgt.y; projC.addChild(_ag);
-            let _aat=0; const _anim=()=>{ _aat+=18; _ag.scale.set(1+_aat/180); _ag.alpha=Math.max(0,1-_aat/280); if(_aat<280) requestAnimationFrame(_anim); else if(projC.children.indexOf(_ag)>=0) projC.removeChild(_ag); }; requestAnimationFrame(_anim);
+            addFadeAnim(projC, _ag, 280, t => _ag.scale.set(1 + t/180));
             for(let ai=enemies.length-1;ai>=0;ai--){
               const ae=enemies[ai]; if(ae===tgt) continue;
               const ad=Math.sqrt((ae.x-tgt.x)**2+(ae.y-tgt.y)**2);
@@ -1992,8 +2042,8 @@ function tick(dt){
               let farthest=null, farthestD=0;
               for(const e of enemies){
                 if(chainHit.has(e)) continue;
-                const d=Math.sqrt((e.x-cSrc.x)**2+(e.y-cSrc.y)**2);
-                if(d<=range && d>farthestD){ farthestD=d; farthest=e; }
+                const d=hexDistance(cSrc.x,cSrc.y,e.x,e.y);
+                if(d<=rangeHex && d>farthestD){ farthestD=d; farthest=e; }
               }
               if(!farthest) break;
               chainHit.add(farthest); chainTargets.push(farthest); cSrc=farthest;
@@ -2027,7 +2077,7 @@ function tick(dt){
               }
               prevSrc=cn;
             }
-            let cgT=0; const animCg=()=>{ cgT+=16; const a=Math.max(0,1-cgT/300); cgfx.alpha=a; for(const fg of flashes){fg.alpha=a;} if(cgT<300) requestAnimationFrame(animCg); else{projC.removeChild(cgfx);for(const fg of flashes)projC.removeChild(fg);} }; requestAnimationFrame(animCg);
+            addFadeAnim(projC, [cgfx, ...flashes], 300);
           }
 
           // 连锁攻击（周瑜，排除庞统）
@@ -2064,21 +2114,20 @@ function tick(dt){
             if(idx>=0){spawnFloat(tgt.x,tgt.y-12,gen?gen.name+'击破':'击破',0xffd24a);removeEnemy(idx);}
           } else { updateEnemyHP(tgt); }
         }
-      }
     }
   }
 
   // ⑦ 少年基地普攻（随等级提升范围/伤害）
   if(shaoNianAtk && enemies.length > 0 && !gameOver){
-    const baseCell = hexCells.find(c=>c.state==='base');
+    const baseCell = baseCellRef;
     if(baseCell){
       shaoNianAtk.timer += app.ticker.deltaMS;
       const atkInterval = 1500 * shaoNianAtk.spdMul;
       if(shaoNianAtk.timer >= atkInterval){
         shaoNianAtk.timer = 0;
-        const range = HEX_SIZE * (3.5 + baseLvl * 0.5) * shaoNianAtk.rangeMul;
+        const rangeHex = Math.max(1, Math.round(HEX_SIZE * (3.5 + baseLvl * 0.5) * shaoNianAtk.rangeMul / HEX_ROW));
         const dmg = (4 + baseLvl * 3) * shaoNianAtk.dmgMul;
-        const inRange = enemies.filter(e2=>Math.sqrt((e2.x-baseCell.px)**2+(e2.y-baseCell.py)**2)<range);
+        const inRange = enemies.filter(e2=>hexDistance(baseCell.px,baseCell.py,e2.x,e2.y)<=rangeHex);
         inRange.sort((a2,b2)=>Math.sqrt((a2.x-baseCell.px)**2+(a2.y-baseCell.py)**2)-Math.sqrt((b2.x-baseCell.px)**2+(b2.y-baseCell.py)**2));
         let hitCount=0;
         for(const st of inRange){
@@ -2353,7 +2402,7 @@ function tick(dt){
             chgGfx.lineTo(t.x+chgNX*(chgLen+HEX_SIZE)+chgNY*7,t.y+chgNY*(chgLen+HEX_SIZE)-chgNX*7);
             chgGfx.moveTo(t.x-chgNX*HEX_SIZE-chgNY*7,t.y-chgNY*HEX_SIZE+chgNX*7);
             chgGfx.lineTo(t.x+chgNX*(chgLen+HEX_SIZE)-chgNY*7,t.y+chgNY*(chgLen+HEX_SIZE)+chgNX*7);
-            let chgT=0; const animChg=()=>{ chgT+=16; chgGfx.alpha=Math.max(0,1-chgT/220); if(chgT<220) requestAnimationFrame(animChg); else projC.removeChild(chgGfx); }; requestAnimationFrame(animChg);
+            addFadeAnim(projC, chgGfx, 220);
             for(let j=enemies.length-1;j>=0;j--){
               const pe=enemies[j]; if(pe===nearest) continue;
               const ex=pe.x-t.x, ey=pe.y-t.y;
@@ -2371,7 +2420,7 @@ function tick(dt){
                 const impG=new PIXI.Graphics(); impG.x=hc.x; impG.y=hc.y; projC.addChild(impG);
                 impG.beginFill(0xff6633,0.28); impG.drawPolygon(hexCorners(HEX_SIZE-2)); impG.endFill();
                 impG.lineStyle(2.5,0xff8844,0.95); impG.drawPolygon(hexCorners(HEX_SIZE-2));
-                let _impT=0; const _animImp=()=>{ _impT+=16; impG.alpha=Math.max(0,1-_impT/240); if(_impT<240) requestAnimationFrame(_animImp); else if(projC.children.indexOf(impG)>=0) projC.removeChild(impG); }; requestAnimationFrame(_animImp);
+                addFadeAnim(projC, impG, 240);
                 if(pe.hp<=0){spawnFloat(pe.x,pe.y-12,'冲阵',0xff8800);removeEnemy(j);}else{updateEnemyHP(pe);}
               }
             }
@@ -2522,7 +2571,7 @@ function fireGuanyuWave(t, target, dmg){
   const flash=new PIXI.Graphics(); flash.x=t.x; flash.y=t.y; projC.addChild(flash); flashes.push(flash);
   flash.beginFill(0xccffff,0.8); flash.drawCircle(0,0,t.size+6); flash.endFill();
   spawnFloat(t.x,t.y-20,'⚔青龙斩',0x88eeff,{fontSize:15,life:40});
-  let _wt=0; const _aw=()=>{ _wt+=20; const a=Math.max(0,1-_wt/450); for(const f of flashes) f.alpha=a; flash.scale.set(1+_wt/120); if(_wt<450) requestAnimationFrame(_aw); else { for(const f of flashes) if(projC.children.indexOf(f)>=0) projC.removeChild(f); } }; requestAnimationFrame(_aw);
+  addFadeAnim(projC, flashes, 450, t => flash.scale.set(1 + t/120));
 }
 
 function spawnGeneralTroop(cell, initialTarget, dmg){
@@ -2568,6 +2617,20 @@ function spawnRallyTroop(cell, dmg){
     moveSpdMul:isMaxLvl&&gen?gen.spdMul||1:1,reflect:isMaxLvl&&gen?gen.reflect||0:0,laneIdx};
   updateTroopHP(troop); troops.push(troop);
   spawnFloat(cell.px,cell.py-28,'→集结',0x88ddff);
+}
+
+function addFadeAnim(container, gfx, durationMs, onTick) {
+  const targets = Array.isArray(gfx) ? gfx : [gfx];
+  let t = 0;
+  const step = () => {
+    t += 16;
+    const a = Math.max(0, 1 - t / durationMs);
+    for (const g of targets) g.alpha = a;
+    if (onTick) onTick(t, a);
+    if (t < durationMs) requestAnimationFrame(step);
+    else for (const g of targets) { if (container.children.indexOf(g) >= 0) container.removeChild(g); }
+  };
+  requestAnimationFrame(step);
 }
 
 function spawnProjectile(sx,sy,tx,ty,hex,size=3,maxLife=18){
