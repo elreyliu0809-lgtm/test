@@ -1200,6 +1200,7 @@ function spawnWave(){
   if(gameOver) return;
   waveCount++;
   if(waveCount > 15){
+    waveCount = 16;     // 投封上限，防止失败路径计数器失控（如不投封会跑到第N波）
     // 所有波次已发完，等场上清空再胜利
     spawnFloat(cx, cy-80, '最终波已结束！清空残敌！', 0xffd24a);
     return;
@@ -2276,7 +2277,7 @@ function tick(dt){
     const tdist=Math.sqrt(tdx*tdx+tdy*tdy);
 
     // 关羽：普通亲兵→基础剑气（1格穿，强化2格），大将亲兵→蓄力青龙波（2格穿，强化3格）
-    if(t.gen && t.gen.key==='guanyu'){
+    if((t.gen&&t.gen.key==='guanyu')||t.genKey==='guanyu'){
       const hd=hexDistance(t.x,t.y,nearest.x,nearest.y);
       const gMov=(t.moveSpdMul||1)*(t.bt&&t.bt.troopSpd||0.25);
       const obsClamp=()=>{ if(t.y < LANE_MERGE_Y - HEX_ROW*2){ const ob=HEX_SIZE+4;
@@ -2686,7 +2687,7 @@ function spawnRallyTroop(cell, dmg){
   const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
   cont.x=cell.px; cont.y=cell.py; projC.addChild(cont);
   const troop={x:cell.px,y:cell.py,homeX:cell.px,homeY:cell.py,hp,maxHp:hp,dmg,cont,hpFill,size,
-    gen:isMaxLvl&&gen?gen:null,bt,atkTimer:0,charge:!!(cell.general&&cell.general.charge),rallying:true,rallyX,rallyY,
+    gen:isMaxLvl&&gen?gen:null,genKey:gen?gen.key:null,bt,atkTimer:0,charge:!!(cell.general&&cell.general.charge),rallying:true,rallyX,rallyY,
     isGeneralTroop:isMaxLvl,sourceCell:isMaxLvl?cell:null,srcKey:cell.building,srcName:cell.general?cell.general.name:cell.building,
     moveSpdMul:isMaxLvl&&gen?gen.spdMul||1:1,reflect:isMaxLvl&&gen?gen.reflect||0:0,laneIdx};
   updateTroopHP(troop); troops.push(troop);
