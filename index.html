@@ -2312,38 +2312,7 @@ function tick(dt){
     const tdx=nearest.x-t.x, tdy=nearest.y-t.y;
     const tdist=Math.sqrt(tdx*tdx+tdy*tdy);
 
-    // 关羽大将亲兵→蓄力青龙波（停下蓄力，六格对齐释放）。普通亲兵改走普攻路径，每N击附带剑气（见下方普攻块）
-    if(((t.gen&&t.gen.key==='guanyu')||t.genKey==='guanyu') && t.isGeneralTroop){
-      const hd=hexDistance(t.x,t.y,nearest.x,nearest.y);
-      const gMov=(t.moveSpdMul||1)*(t.bt&&t.bt.troopSpd||0.25);
-      const obsClamp=()=>{ if(t.y < LANE_MERGE_Y - HEX_ROW*2){ const ob=HEX_SIZE+4;
-        if(t.laneIdx===0) t.x=Math.min(t.x,LANE_BOUNDS[0]-ob);
-        else if(t.laneIdx===2) t.x=Math.max(t.x,LANE_BOUNDS[1]+ob);
-        else t.x=Math.max(LANE_BOUNDS[0]+ob,Math.min(t.x,LANE_BOUNDS[1]-ob)); } };
-      const CHARGE_MS=1000;
-      if(hd>3){
-        // 接近中：清空蓄力并移动
-        t._charge=0; if(t._chargeGfx) t._chargeGfx.visible=false;
-        const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
-        const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
-        t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
-      } else {
-        // 进入射程：停下蓄力（不移动），满蓄发波——六格对齐纪律
-        t._charge=(t._charge||0)+app.ticker.deltaMS;
-        if(!t._chargeGfx){ t._chargeGfx=new PIXI.Graphics(); t.cont.addChild(t._chargeGfx); }
-        t._chargeGfx.visible=true;
-        const cp=Math.min(1,t._charge/CHARGE_MS);
-        t._chargeGfx.clear(); t._chargeGfx.lineStyle(2,0x66ddff,0.4+0.55*cp); t._chargeGfx.drawCircle(0,0,t.size+4+cp*7);
-        if(cp>=1){ t._chargeGfx.beginFill(0xaaffff,0.22); t._chargeGfx.drawCircle(0,0,t.size+2); t._chargeGfx.endFill(); }
-        if(t._charge>=CHARGE_MS){
-          t._charge=0; t._chargeGfx.visible=false;
-          const tnow=performance.now();
-          const guanyuBonus=globalBuffs.presenceBuff_guanyu ? 1+Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
-          fireGuanyuWave(t, nearest, t.dmg*guanyuBonus*3.0);
-        }
-      }
-      continue;
-    }
+    // 关羽（普通亲兵+大将亲兵）均走下方普攻路径，普攻为主、周期附带剑气/青龙波——不再站桩远程刷屏（见普攻块periodic）
 
     // 亲兵移速：gen.spdMul 接入（赵云2.0→实际跑速翻倍；太史慈buff叠加）
     const baseMovSpd = t.moveSpdMul || 1;
@@ -2395,10 +2364,14 @@ function tick(dt){
           }
         }
 
-        // 关羽普通亲兵：普攻为主，每4次普攻附带一道穿透剑气（六格对齐，频率/强度远低于旧版纯剑气）
-        if(((t.gen&&t.gen.key==='guanyu')||t.genKey==='guanyu') && !t.isGeneralTroop){
+        // 关羽：普攻为主。普通亲兵每4击附带穿透剑气；大将亲兵每5击附带青龙波斩（均六格对齐，不再站桩远程刷屏）
+        if((t.gen&&t.gen.key==='guanyu')||t.genKey==='guanyu'){
           t._slashCount=(t._slashCount||0)+1;
-          if(t._slashCount>=4){ t._slashCount=0; fireGuanyuBasicSlash(t, nearest, troopDmg); }
+          if(t.isGeneralTroop){
+            if(t._slashCount>=5){ t._slashCount=0; fireGuanyuWave(t, nearest, troopDmg*2.0); }
+          } else {
+            if(t._slashCount>=4){ t._slashCount=0; fireGuanyuBasicSlash(t, nearest, troopDmg); }
+          }
         }
 
         if(t.gen){
@@ -2416,24 +2389,21 @@ function tick(dt){
             }
           }
           if(t.gen.aoe){
-            const aoeRMul=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?globalBuffs.aoeRadiusMul_zhangfei:1;
+            // 张飞·爆裂震地：以命中格为中心，按六边形【环格】判定+高亮（霸王怒→2圈，否则1圈）——遵守六格对齐纪律，不用自由圆/扇形
+            const ringN=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?2:1;
             const aoeDmg=troopDmg*0.65;
-            const aoeR=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?HEX_ROW*2:HEX_ROW*1.5;
-            // 爆裂扇形视觉：朝目标方向±60°冲击波，让张飞AOE可见（旧版只有飘字看不出技能）
-            const _fa=Math.atan2(nearest.y-t.y, nearest.x-t.x);
-            const _ag=new PIXI.Graphics(); _ag.x=t.x; _ag.y=t.y; projC.addChild(_ag);
-            _ag.beginFill(0xff5533,0.30); _ag.moveTo(0,0); _ag.arc(0,0,aoeR,_fa-Math.PI/3,_fa+Math.PI/3); _ag.lineTo(0,0); _ag.endFill();
-            _ag.lineStyle(3,0xff7744,0.95); _ag.arc(0,0,aoeR,_fa-Math.PI/3,_fa+Math.PI/3);
-            addFadeAnim(projC, _ag, 260);
-            // 前方扇形：以自身格为圆心，朝攻击目标方向±60°两圈范围溅射
-            const fwdA=Math.atan2(nearest.y-t.y, nearest.x-t.x);
+            const hc=pixelToHexCenter(nearest.x,nearest.y);
+            // 六边形格高亮视觉：命中格+环格逐格点亮
+            const _ag=new PIXI.Graphics(); projC.addChild(_ag);
+            for(const o of hexDiskOffsets(ringN)){
+              _ag.beginFill(0xff5533,0.26); _ag.drawPolygon(hexPoly(hc.x+o.dx, hc.y+o.dy, HEX_SIZE-2)); _ag.endFill();
+              _ag.lineStyle(2,0xff7744,0.85); _ag.drawPolygon(hexPoly(hc.x+o.dx, hc.y+o.dy, HEX_SIZE-2)); _ag.lineStyle(0);
+            }
+            addFadeAnim(projC, _ag, 300);
+            // 环格内敌人受溅射（按六边形格距离判定，排除已被普攻命中的 nearest）
             for(let j=enemies.length-1;j>=0;j--){
               const ae=enemies[j]; if(ae===nearest) continue;
-              const dx2=ae.x-t.x, dy2=ae.y-t.y;
-              const ad=Math.sqrt(dx2*dx2+dy2*dy2);
-              if(ad>=aoeR) continue;
-              let angDiff=Math.abs(Math.atan2(dy2,dx2)-fwdA); if(angDiff>Math.PI) angDiff=2*Math.PI-angDiff;
-              if(angDiff>Math.PI/3) continue;
+              if(hexDistance(nearest.x,nearest.y,ae.x,ae.y) > ringN) continue;
               ae.hp-=aoeDmg; spawnFloat(ae.x,ae.y-10,Math.round(aoeDmg)+'',0xff5a5a);
               trackDmg(t.srcKey, t.srcName, aoeDmg);
               if(globalBuffs.aoeBurn_zhangfei&&t.gen.key==='zhangfei'){
@@ -2830,7 +2800,7 @@ function buildWarReport(isWin, failedWave){
   }
 
   return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4 ──</div>
+    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.2 ──</div>
     ${R('阵容', lineup, '#fff')}
     <div style="font-size:10.5px;padding:1px 0"><span style="color:#8fa6b2">结果</span> ${resultStr} &nbsp;<span style="color:#8fa6b2">时长</span> <span style="color:#4affff">${elapsedStr}</span> &nbsp;<span style="color:#8fa6b2">翻格</span> <span style="color:#ffd24a">${totalFlips}次</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
