@@ -2252,7 +2252,23 @@ function tick(dt){
       if(enemies.length>0){
         const alertR = HEX_SIZE * 6; // 3圈警戒半径
         if(enemies.some(e=>Math.sqrt((e.x-t.x)**2+(e.y-t.y)**2)<alertR)) t.rallying=false;
-        else continue; // 无近敌：固守集结点，不追击传送门区域远敌
+        else {
+          // 无近敌：仍向集结点前进，不追击远敌
+          const rdx=t.rallyX-t.x, rdy=t.rallyY-t.y;
+          const rdist=Math.sqrt(rdx*rdx+rdy*rdy);
+          if(rdist>5){
+            t.x+=rdx/rdist*0.25*dt; t.y+=rdy/rdist*0.25*dt;
+            if(t.y < LANE_MERGE_Y - HEX_ROW * 2){
+              const obsBuf=HEX_SIZE+4;
+              if(t.laneIdx===0)      t.x=Math.min(t.x,LANE_BOUNDS[0]-obsBuf);
+              else if(t.laneIdx===2) t.x=Math.max(t.x,LANE_BOUNDS[1]+obsBuf);
+              else t.x=Math.max(LANE_BOUNDS[0]+obsBuf,Math.min(t.x,LANE_BOUNDS[1]-obsBuf));
+            }
+            t.cont.x=t.x; t.cont.y=t.y;
+          }
+          if(t.y < HEX_SIZE * 3){ t.y = HEX_SIZE * 3; t.cont.y = t.y; }
+          continue;
+        }
       }
       else {
         const rdx=t.rallyX-t.x, rdy=t.rallyY-t.y;
@@ -2282,7 +2298,7 @@ function tick(dt){
         t.rallying = true;
         const _rLane = t.laneIdx!=null ? t.laneIdx : 1;
         t.rallyX = LANES[_rLane];
-        t.rallyY = cy - HEX_ROW * 1;
+        t.rallyY = cy - HEX_ROW * 3;
       }
       continue;
     }
@@ -2576,6 +2592,7 @@ function spawnTroop(cell, initialTarget, dmg){
   const spawnY=TROOP_Y_FLOOR - HEX_SIZE*0.5;
   const cont=new PIXI.Container();
   const body=new PIXI.Graphics(); body.beginFill(isGen?0xffd24a:bt.hex); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  if(cell.general){ const iconGfx=new PIXI.Graphics(); drawWeaponIcon(iconGfx,cell.general.key,size); cont.addChild(iconGfx); }
   const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-size-6,16,3); hpBg.endFill(); cont.addChild(hpBg);
   const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
   cont.x=spawnX; cont.y=spawnY; projC.addChild(cont);
@@ -2593,7 +2610,7 @@ function updateTroopHP(t){
 
 function removeTroop(idx){ projC.removeChild(troops[idx].cont); troops.splice(idx,1); }
 
-// 关羽·基础剑气：普通亲兵400ms出一次，穿1格（义绝→2格），轻量刀光
+// 关羽·基础剑气：普通亲兵3000ms出一次，穿1格（义绝→2格），轻量刀光
 function fireGuanyuBasicSlash(t, target, dmg){
   const cur=pixelToAxial(t.x,t.y);
   const gdx=target.x-t.x, gdy=target.y-t.y, gl=Math.hypot(gdx,gdy)||1;
@@ -2620,6 +2637,34 @@ function fireGuanyuBasicSlash(t, target, dmg){
         if(pe.hp<=0){spawnFloat(pe.x,pe.y-12,'剑气',0x99eeff);removeEnemy(j);}else updateEnemyHP(pe);
       }
     }
+  }
+}
+
+// 武器图标：根据武将 key 在小兵圆圈内绘制简单几何武器形状
+function drawWeaponIcon(g, genKey, sz){
+  const h = Math.max(Math.floor(sz * 0.75), 3);
+  const lw = Math.max(1, Math.round(sz * 0.22));
+  g.lineStyle(lw, 0xffffff, 0.85);
+  if(genKey==='guanyu'){         // 青龙偃月刀：斜刀柄+刀头钩
+    g.moveTo(-h*0.5,h*0.7); g.lineTo(h*0.3,-h*0.7);
+    g.moveTo(h*0.3,-h*0.7); g.lineTo(-h*0.1,-h*0.3);
+  } else if(genKey==='zhangfei'){// 丈八蛇矛：竖线+宽V形头
+    g.moveTo(0,h); g.lineTo(0,-h*0.4);
+    g.moveTo(-h*0.4,-h*0.2); g.lineTo(0,-h); g.lineTo(h*0.4,-h*0.2);
+  } else if(genKey==='zhaoyun'){ // 龙胆亮银枪：竖线+窄V形头
+    g.moveTo(0,h); g.lineTo(0,-h*0.5);
+    g.moveTo(-h*0.2,-h*0.3); g.lineTo(0,-h); g.lineTo(h*0.2,-h*0.3);
+  } else if(genKey==='caoren'){  // 盾：圆角矩形外框
+    g.beginFill(0,0); g.drawRoundedRect(-h*0.5,-h*0.7,h,h*1.2,h*0.25); g.endFill();
+  } else if(genKey==='dianwei'){ // 单边手戟：T形+右侧延伸
+    g.moveTo(0,h); g.lineTo(0,-h*0.2);
+    g.moveTo(-h*0.5,-h*0.2); g.lineTo(h*0.5,-h*0.2);
+    g.moveTo(h*0.4,-h*0.2); g.lineTo(h*0.4,-h*0.7);
+  } else if(genKey==='lvbu'){    // 方天画戟：长十字+双角翼
+    g.moveTo(0,h); g.lineTo(0,-h);
+    g.moveTo(-h*0.55,-h*0.1); g.lineTo(h*0.55,-h*0.1);
+    g.moveTo(-h*0.55,-h*0.5); g.lineTo(-h*0.2,-h*0.85);
+    g.moveTo(h*0.55,-h*0.5); g.lineTo(h*0.2,-h*0.85);
   }
 }
 
@@ -2692,7 +2737,7 @@ function spawnRallyTroop(cell, dmg){
   const laneIdx = _cq < 0 ? 0 : _cq > 0 ? 2 : 1;
   // 集结点：建筑格对应列，建筑群外沿再向前约一格
   const rallyX = LANES[laneIdx];
-  const rallyY = cy - HEX_ROW * 1;
+  const rallyY = cy - HEX_ROW * 3;
   const bt=B_TYPES.find(b=>b.key===cell.category);
   const gen=cell.general; const isMaxLvl=cell.lvl>=TUNE.maxLvl&&gen;
   const size=isMaxLvl?(gen.projSize||6)+2:5;
@@ -2700,6 +2745,7 @@ function spawnRallyTroop(cell, dmg){
   const cont=new PIXI.Container();
   const body=new PIXI.Graphics(); body.beginFill(isMaxLvl?0xffd24a:bt.hex,0.65); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
   const ring=new PIXI.Graphics(); ring.lineStyle(1.5,0x88ddff,0.7); ring.drawCircle(0,0,size+2); cont.addChild(ring);
+  if(gen){ const iconGfx=new PIXI.Graphics(); drawWeaponIcon(iconGfx,gen.key,size); cont.addChild(iconGfx); }
   const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-size-6,16,3); hpBg.endFill(); cont.addChild(hpBg);
   const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
   cont.x=cell.px; cont.y=cell.py; projC.addChild(cont);
