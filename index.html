@@ -1502,6 +1502,8 @@ function tick(dt){
     // 许褚击晕/铁锁：冻结中不移动不攻击
     if(e.stunUntil && now < e.stunUntil) continue;
     if(e.rooted && e.rootUntil && now < e.rootUntil) continue;
+    // 六格对齐纪律：BOSS 震地锥蓄力期间停止移动，技能范围不随移动漂移
+    if(e.isBoss && e.castUntil && now < e.castUntil){ e.cont.x=e.x; e.cont.y=e.y; continue; }
 
     // 已到达城墙，持续攻击（蔚蓝模式）
     if(e.attacking){
@@ -1666,9 +1668,11 @@ function tick(dt){
     boss.skillTimer = (boss.skillTimer||0) + app.ticker.deltaMS;
     if(boss.skillTimer >= 8000 && !bossAoe){
       boss.skillTimer = 0;
-      bossAoe = { phase:'warn', timer:0, radius:HEX_ROW*2, half:Math.PI/3, cap:4, gfx:new PIXI.Graphics() };
+      const _oc = pixelToHexCenter(boss.x, boss.y);   // 六格对齐：锁定开蓄力瞬间的格心，锥不再随移动漂移
+      bossAoe = { phase:'warn', timer:0, radius:HEX_ROW*2, half:Math.PI/3, cap:4, ox:_oc.x, oy:_oc.y, gfx:new PIXI.Graphics() };
+      boss.castUntil = now + 800;                      // 蓄力期间停止移动（见移动循环停移判断）
       projC.addChild(bossAoe.gfx);
-      spawnFloat(boss.x, boss.y-44, '⚠ 曹操·震地锥', 0xffa500);
+      spawnFloat(_oc.x, _oc.y-44, '⚠ 曹操·震地锥', 0xffa500);
       blip(90,0.5,'sawtooth',0.2);
     }
     // BOSS 攻城时钟：每 6s 直接扣城墙 10 HP，不依赖亲兵存在性
@@ -1701,7 +1705,7 @@ function tick(dt){
       const p = Math.min(1, bossAoe.timer/800);
       const fa = (0.10+0.18*p) * (0.6+0.4*Math.abs(Math.sin(bossAoe.timer/80)));
       for(const o of coneCells){
-        const hx=boss.x+o.dx, hy=boss.y+o.dy;
+        const hx=bossAoe.ox+o.dx, hy=bossAoe.oy+o.dy;
         g.beginFill(0xffa500, fa); g.drawPolygon(hexPoly(hx,hy,HEX_SIZE-2)); g.endFill();
         g.lineStyle(2, 0xffcc55, 0.5+0.4*p); g.drawPolygon(hexPoly(hx,hy,HEX_SIZE-2)); g.lineStyle(0);
       }
@@ -1711,15 +1715,15 @@ function tick(dt){
         // 爆发：锥内格按格距离近的优先，最多击退 cap 个亲兵/士兵（不死亡只打断）
         const inCone = [];
         for(const t of troops){
-          const hd=hexDistance(boss.x,boss.y,t.x,t.y);
+          const hd=hexDistance(bossAoe.ox,bossAoe.oy,t.x,t.y);
           if(hd<1 || hd>Rhex) continue;
-          let diff=Math.abs(Math.atan2(t.y-boss.y,t.x-boss.x)-dirA); if(diff>Math.PI) diff=2*Math.PI-diff;
+          let diff=Math.abs(Math.atan2(t.y-bossAoe.oy,t.x-bossAoe.ox)-dirA); if(diff>Math.PI) diff=2*Math.PI-diff;
           if(diff <= bossAoe.half) inCone.push({t,d:hd});
         }
         inCone.sort((a,b)=>a.d-b.d);
         for(let k=0;k<Math.min(bossAoe.cap,inCone.length);k++){
           const t=inCone[k].t;
-          const kdx=t.x-boss.x, kdy=t.y-boss.y, kd=Math.sqrt(kdx*kdx+kdy*kdy)||1;
+          const kdx=t.x-bossAoe.ox, kdy=t.y-bossAoe.oy, kd=Math.sqrt(kdx*kdx+kdy*kdy)||1;
           t.x += (kdx/kd)*HEX_SIZE*3 + (Math.random()-0.5)*22;
           t.y += (kdy/kd)*HEX_SIZE*3 + (Math.random()-0.5)*22;
           t.y = Math.min(t.y, TROOP_Y_FLOOR);
@@ -1732,7 +1736,7 @@ function tick(dt){
       const p = Math.min(1, bossAoe.timer/350);
       g.lineStyle(0);
       for(const o of coneCells){
-        g.beginFill(0xfff0c0, 0.5*(1-p)); g.drawPolygon(hexPoly(boss.x+o.dx, boss.y+o.dy, HEX_SIZE-2)); g.endFill();
+        g.beginFill(0xfff0c0, 0.5*(1-p)); g.drawPolygon(hexPoly(bossAoe.ox+o.dx, bossAoe.oy+o.dy, HEX_SIZE-2)); g.endFill();
       }
       if(bossAoe.timer >= 350){ projC.removeChild(g); bossAoe=null; }
     }
@@ -2308,53 +2312,34 @@ function tick(dt){
     const tdx=nearest.x-t.x, tdy=nearest.y-t.y;
     const tdist=Math.sqrt(tdx*tdx+tdy*tdy);
 
-    // 关羽：普通亲兵→基础剑气（1格穿，强化2格），大将亲兵→蓄力青龙波（2格穿，强化3格）
-    if((t.gen&&t.gen.key==='guanyu')||t.genKey==='guanyu'){
+    // 关羽大将亲兵→蓄力青龙波（停下蓄力，六格对齐释放）。普通亲兵改走普攻路径，每N击附带剑气（见下方普攻块）
+    if(((t.gen&&t.gen.key==='guanyu')||t.genKey==='guanyu') && t.isGeneralTroop){
       const hd=hexDistance(t.x,t.y,nearest.x,nearest.y);
       const gMov=(t.moveSpdMul||1)*(t.bt&&t.bt.troopSpd||0.25);
       const obsClamp=()=>{ if(t.y < LANE_MERGE_Y - HEX_ROW*2){ const ob=HEX_SIZE+4;
         if(t.laneIdx===0) t.x=Math.min(t.x,LANE_BOUNDS[0]-ob);
         else if(t.laneIdx===2) t.x=Math.max(t.x,LANE_BOUNDS[1]+ob);
         else t.x=Math.max(LANE_BOUNDS[0]+ob,Math.min(t.x,LANE_BOUNDS[1]-ob)); } };
-
-      if(!t.isGeneralTroop){
-        // 普通亲兵：推进到2格内，400ms发射基础剑气（穿1格，义绝→穿2格）
-        if(hd>2){
-          const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
-          const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
-          t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
-        } else {
-          t._atkTimer=(t._atkTimer||0)+app.ticker.deltaMS;
-          if(t._atkTimer>=3000){
-            t._atkTimer=0;
-            fireGuanyuBasicSlash(t, nearest, t.dmg*1.5);
-          }
-        }
+      const CHARGE_MS=1000;
+      if(hd>3){
+        // 接近中：清空蓄力并移动
+        t._charge=0; if(t._chargeGfx) t._chargeGfx.visible=false;
+        const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
+        const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
+        t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
       } else {
-        // 大将亲兵：蓄力青龙波（2格穿，义绝→3格）
-        const CHARGE_MS=1000;
-        if(hd>3){
-          t._charge=0; if(t._chargeGfx) t._chargeGfx.visible=false;
-          const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
-          const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
-          t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
-        } else {
-          t._charge=(t._charge||0)+app.ticker.deltaMS;
-          if(!t._chargeGfx){ t._chargeGfx=new PIXI.Graphics(); t.cont.addChild(t._chargeGfx); }
-          t._chargeGfx.visible=true;
-          const cp=Math.min(1,t._charge/CHARGE_MS);
-          t._chargeGfx.clear(); t._chargeGfx.lineStyle(2,0x66ddff,0.4+0.55*cp); t._chargeGfx.drawCircle(0,0,t.size+4+cp*7);
-          if(cp>=1){ t._chargeGfx.beginFill(0xaaffff,0.22); t._chargeGfx.drawCircle(0,0,t.size+2); t._chargeGfx.endFill(); }
-          if(hd>2){
-            const wp=nextStepCenter(t.x,t.y,nearest.x,nearest.y);
-            const wdx=wp.x-t.x,wdy=wp.y-t.y,wl=Math.hypot(wdx,wdy)||1;
-            t.x+=wdx/wl*gMov*0.6*dt; t.y+=wdy/wl*gMov*0.6*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
-          } else if(t._charge>=CHARGE_MS){
-            t._charge=0; t._chargeGfx.visible=false;
-            const tnow=performance.now();
-            const guanyuBonus=globalBuffs.presenceBuff_guanyu ? 1+Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
-            fireGuanyuWave(t, nearest, t.dmg*guanyuBonus*3.0);
-          }
+        // 进入射程：停下蓄力（不移动），满蓄发波——六格对齐纪律
+        t._charge=(t._charge||0)+app.ticker.deltaMS;
+        if(!t._chargeGfx){ t._chargeGfx=new PIXI.Graphics(); t.cont.addChild(t._chargeGfx); }
+        t._chargeGfx.visible=true;
+        const cp=Math.min(1,t._charge/CHARGE_MS);
+        t._chargeGfx.clear(); t._chargeGfx.lineStyle(2,0x66ddff,0.4+0.55*cp); t._chargeGfx.drawCircle(0,0,t.size+4+cp*7);
+        if(cp>=1){ t._chargeGfx.beginFill(0xaaffff,0.22); t._chargeGfx.drawCircle(0,0,t.size+2); t._chargeGfx.endFill(); }
+        if(t._charge>=CHARGE_MS){
+          t._charge=0; t._chargeGfx.visible=false;
+          const tnow=performance.now();
+          const guanyuBonus=globalBuffs.presenceBuff_guanyu ? 1+Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
+          fireGuanyuWave(t, nearest, t.dmg*guanyuBonus*3.0);
         }
       }
       continue;
@@ -2410,6 +2395,12 @@ function tick(dt){
           }
         }
 
+        // 关羽普通亲兵：普攻为主，每4次普攻附带一道穿透剑气（六格对齐，频率/强度远低于旧版纯剑气）
+        if(((t.gen&&t.gen.key==='guanyu')||t.genKey==='guanyu') && !t.isGeneralTroop){
+          t._slashCount=(t._slashCount||0)+1;
+          if(t._slashCount>=4){ t._slashCount=0; fireGuanyuBasicSlash(t, nearest, troopDmg); }
+        }
+
         if(t.gen){
           if(t.gen.slow){ nearest.slowFactor=t.gen.slow; nearest.slowUntil=tnow+2000; }
           if(t.gen.stun && Math.random()<(t.gen.stun||0.3)){
@@ -2426,8 +2417,14 @@ function tick(dt){
           }
           if(t.gen.aoe){
             const aoeRMul=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?globalBuffs.aoeRadiusMul_zhangfei:1;
-            const aoeDmg=troopDmg*0.5;
+            const aoeDmg=troopDmg*0.65;
             const aoeR=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?HEX_ROW*2:HEX_ROW*1.5;
+            // 爆裂扇形视觉：朝目标方向±60°冲击波，让张飞AOE可见（旧版只有飘字看不出技能）
+            const _fa=Math.atan2(nearest.y-t.y, nearest.x-t.x);
+            const _ag=new PIXI.Graphics(); _ag.x=t.x; _ag.y=t.y; projC.addChild(_ag);
+            _ag.beginFill(0xff5533,0.30); _ag.moveTo(0,0); _ag.arc(0,0,aoeR,_fa-Math.PI/3,_fa+Math.PI/3); _ag.lineTo(0,0); _ag.endFill();
+            _ag.lineStyle(3,0xff7744,0.95); _ag.arc(0,0,aoeR,_fa-Math.PI/3,_fa+Math.PI/3);
+            addFadeAnim(projC, _ag, 260);
             // 前方扇形：以自身格为圆心，朝攻击目标方向±60°两圈范围溅射
             const fwdA=Math.atan2(nearest.y-t.y, nearest.x-t.x);
             for(let j=enemies.length-1;j>=0;j--){
