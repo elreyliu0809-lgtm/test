@@ -1552,7 +1552,7 @@ function tick(dt){
     let taunted = false;
     if(!e.immuneTaunt){
       for(const tr of troops){
-        if(tr.srcName!=='曹仁') continue;                        // 所有曹仁亲兵（各等级）都嘲讽
+        if(tr.srcName!=='曹仁' || !tr._tauntActive) continue;   // 嘲讽激活期间才吸引
         const trN = (tr.gen && tr.gen.key==='caoren' && globalBuffs.tauntRangeMul_caoren) ? 2 : 1; // 扩范围强化仅本体(Lv4出将)生效，亲兵恒1圈
         if(hexDistance(e.x,e.y,tr.x,tr.y) <= trN){ moveX = tr.x; moveY = tr.y; taunted = true; e._taunted=true; break; }
       }
@@ -1670,6 +1670,18 @@ function tick(dt){
       projC.addChild(bossAoe.gfx);
       spawnFloat(boss.x, boss.y-44, '⚠ 曹操·震地锥', 0xffa500);
       blip(90,0.5,'sawtooth',0.2);
+    }
+    // BOSS 攻城时钟：每 6s 直接扣城墙 10 HP，不依赖亲兵存在性
+    if(boss.attacking){
+      boss.wallTimer = (boss.wallTimer||0) + app.ticker.deltaMS;
+      if(boss.wallTimer >= 6000){
+        boss.wallTimer = 0;
+        baseHP = Math.max(0, baseHP - 10);
+        updateHUD(); shake=Math.max(shake,8);
+        spawnProjectile(boss.x, boss.y, cx, cy-20, 0xff2200, 10);
+        spawnFloat(cx, cy-40, '⚔ 曹操·破城 -10', 0xff2200);
+        if(baseHP <= 0){ baseHP = 0; endGame(); }
+      }
     }
   }
   if(bossAoe){
@@ -2214,13 +2226,16 @@ function tick(dt){
 
   for(let i=troops.length-1;i>=0;i--){
     const t=troops[i];
-    // 曹仁嘲讽：CD 1500ms 单次扩散圆环特效，常驻状态靠敌人身上的 debuff 橙环显示
+    // 曹仁嘲讽：3s CD，激活后持续1.5s；视觉圆环跟随激活状态触发
     if(t.srcName==='曹仁'){
       const N = (t.gen && t.gen.key==='caoren' && globalBuffs.tauntRangeMul_caoren) ? 2 : 1;
       let anyInRange=false;
       for(const e of enemies){ if(hexDistance(t.x,t.y,e.x,e.y)<=N){ anyInRange=true; break; } }
       const _tnow=performance.now();
-      if(anyInRange && (!t._tauntAnimAt || _tnow-t._tauntAnimAt>1500)){
+      // 嘲讽CD管理：3s CD，触发后激活1.5s
+      if(anyInRange && (!t._tauntCd || _tnow-t._tauntCd>=3000)){ t._tauntCd=_tnow; t._tauntActive=true; }
+      if(t._tauntActive && t._tauntCd && _tnow-t._tauntCd>=1500) t._tauntActive=false;
+      if(anyInRange && t._tauntActive && (!t._tauntAnimAt || _tnow-t._tauntAnimAt>3000)){
         t._tauntAnimAt=_tnow;
         const rg=new PIXI.Graphics(); rg.x=t.x; rg.y=t.y; projC.addChild(rg);
         addFadeAnim(projC, rg, 600, (et, alpha)=>{
@@ -2237,6 +2252,7 @@ function tick(dt){
       if(enemies.length>0){
         const alertR = HEX_SIZE * 6; // 3圈警戒半径
         if(enemies.some(e=>Math.sqrt((e.x-t.x)**2+(e.y-t.y)**2)<alertR)) t.rallying=false;
+        else continue; // 无近敌：固守集结点，不追击传送门区域远敌
       }
       else {
         const rdx=t.rallyX-t.x, rdy=t.rallyY-t.y;
@@ -2293,7 +2309,7 @@ function tick(dt){
           t.x+=wdx/wl*gMov*dt; t.y+=wdy/wl*gMov*dt; obsClamp(); t.cont.x=t.x; t.cont.y=t.y;
         } else {
           t._atkTimer=(t._atkTimer||0)+app.ticker.deltaMS;
-          if(t._atkTimer>=400){
+          if(t._atkTimer>=3000){
             t._atkTimer=0;
             fireGuanyuBasicSlash(t, nearest, t.dmg*1.5);
           }
@@ -2427,8 +2443,9 @@ function tick(dt){
             }
           }
         } // end if(t.gen)
-        // 吕布铁骑冲阵：所有等级均有（charge标志在spawnTroop时写入），Lv4武将版伤更高
-        if((t.gen && t.gen.charge) || t.charge){
+        // 吕布铁骑冲阵：独立3s CD（约每7.5次普攻触发一次），不与普攻频率绑定
+        t._chargeCd=(t._chargeCd||0)+troopAtkInterval;
+        if(((t.gen && t.gen.charge) || t.charge) && t._chargeCd>=3000){ t._chargeCd=0;
             const chgDx=nearest.x-t.x, chgDy=nearest.y-t.y;
             const chgLen=Math.sqrt(chgDx*chgDx+chgDy*chgDy)||1;
             const chgNX=chgDx/chgLen, chgNY=chgDy/chgLen;
