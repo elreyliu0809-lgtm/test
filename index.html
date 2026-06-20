@@ -37,14 +37,14 @@ body { display:flex; flex-direction:column; align-items:center; }
 #gameOverlay button { margin-top:16px; background:#1f6feb; color:#fff; border:none; border-radius:8px; padding:10px 24px; font-size:16px; cursor:pointer; }
 
 /* 选择面板 */
-#pickOverlay { position:absolute; inset:0; background:#000a; display:none; justify-content:center; align-items:center; z-index:25; flex-direction:column; }
-#pickTitle { color:#ffd24a; font-size:18px; font-weight:800; margin-bottom:12px; text-shadow:0 2px 8px #000; }
-#pickOptions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; padding:0 16px; }
-.pick-card { background:#16242c; border:2px solid #2c3f4b; border-radius:12px; padding:12px 14px; min-width:120px;
+#pickOverlay { position:absolute; inset:0; background:#000a; display:none; justify-content:flex-start; align-items:center; z-index:25; flex-direction:column; padding-top:5%; overflow-y:auto; }
+#pickTitle { color:#ffd24a; font-size:18px; font-weight:800; margin-bottom:10px; text-shadow:0 2px 8px #000; }
+#pickOptions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; padding:0 12px; width:100%; align-items:flex-start; }
+.pick-card { background:#16242c; border:2px solid #2c3f4b; border-radius:10px; padding:8px 10px; flex:1; min-width:88px; max-width:120px;
   cursor:pointer; text-align:center; transition:all .15s; }
 .pick-card:hover { border-color:#ffd24a; transform:scale(1.06); }
-.pick-icon { font-size:24px; margin-bottom:4px; }
-.pick-name { font-size:15px; font-weight:700; color:#e8eef2; }
+.pick-icon { font-size:20px; margin-bottom:3px; }
+.pick-name { font-size:14px; font-weight:700; color:#e8eef2; }
 .pick-desc { font-size:11px; color:#8fa6b2; margin-top:3px; }
 
 /* 战前选将 */
@@ -255,7 +255,7 @@ const SHAONIAN_UPGRADES = [
 const GENERAL_UPGRADES = {
   // ── 进攻将 ──
   guanyu: [
-    { key:'guanyu_a', name:'关羽·义绝', desc:'青龙斩穿透延长至5格（+2格）', icon:'⚔',
+    { key:'guanyu_a', name:'关羽·义绝', desc:'近战溅射约2格（50%伤害）；剑气穿透+1格、青龙波穿透+1格', icon:'⚔',
       apply: g=>{ g.troopSplash_guanyu=true; }},
     { key:'guanyu_b', name:'关羽·武圣', desc:'每次产兵时激励全军，8秒内每批次产兵全体亲兵伤害+8%（最多3层+24%）', icon:'👑',
       apply: g=>{ g.presenceBuff_guanyu=true; }},
@@ -279,7 +279,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.ganningChain=true; }},
   ],
   taishici: [
-    { key:'taishici_a', name:'太史慈·穿云贯日', desc:'弹道穿透3次，每次+10%伤害', icon:'➶',
+    { key:'taishici_a', name:'太史慈·穿云贯日', desc:'弹道穿透3次，每次×0.75递减伤害', icon:'➶',
       apply: g=>{ g.pierce_taishici=3; }},
     { key:'taishici_b', name:'太史慈·鸣镝', desc:'每4发蓄力，第5发伤害×2弹速×3', icon:'🎯',
       apply: g=>{ g.mingdi_taishici=true; }},
@@ -547,12 +547,15 @@ function boot(){
   const canvas = document.getElementById('stage');
   const area = document.getElementById('gameArea');
   W = Math.min(480, window.innerWidth);
-  // 锁定分辨率：预留80px给tune栏最大高度（3行wrap时约75px），避免选将后tune增高导致画布溢出
+  // 动态测量 tune 和 hpHud 实际高度，避免硬编码回退值在小视口手机溢出
+  const tuneEl = document.getElementById('tune');
+  const tuneH = (tuneEl && tuneEl.offsetHeight > 0) ? tuneEl.offsetHeight : 40;
   const hudEl = document.getElementById('hpHud');
-  const hudH = (hudEl && hudEl.offsetHeight > 0) ? hudEl.offsetHeight : 52;
-  H = Math.max(window.innerHeight - 80 - hudH, 600);
+  const hudH = (hudEl && hudEl.offsetHeight > 0) ? hudEl.offsetHeight : 80;
+  // 最小 400px（不用 600px 避免强制溢出）
+  H = Math.max(window.innerHeight - tuneH - hudH, 400);
   area.style.height = H + 'px';
-  area.style.flex = 'none'; // 防止flex在tune增高后压缩gameArea
+  area.style.flex = 'none'; // 防止 flex 在 tune 增高后压缩 gameArea
   canvas.width = W; canvas.height = H;
 
   app = new PIXI.Application({ view:canvas, width:W, height:H,
@@ -2800,7 +2803,7 @@ function buildWarReport(isWin, failedWave){
   }
 
   return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.2 ──</div>
+    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.4 ──</div>
     ${R('阵容', lineup, '#fff')}
     <div style="font-size:10.5px;padding:1px 0"><span style="color:#8fa6b2">结果</span> ${resultStr} &nbsp;<span style="color:#8fa6b2">时长</span> <span style="color:#4affff">${elapsedStr}</span> &nbsp;<span style="color:#8fa6b2">翻格</span> <span style="color:#ffd24a">${totalFlips}次</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
