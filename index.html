@@ -7,40 +7,40 @@
 <script src="https://cdn.jsdelivr.net/npm/pixi.js-legacy@7.3.2/dist/pixi-legacy.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-html,body { background:#0e1418; color:#e8eef2; font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+html,body { background:#ede0c4; color:#2a1808; font-family:"PingFang SC","STKaiti","KaiTi","HiraMinProN-W3","Microsoft YaHei",system-ui,sans-serif;
   overflow:hidden; height:100%; }
 body { display:flex; flex-direction:column; align-items:center; }
 
-#tune { width:100%; background:#0a0f12ee; border-bottom:1px solid #1d2a32; padding:5px 10px 20px;
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11px; color:#8fa6b2; z-index:10;
+#tune { width:100%; background:#e8d8b8ee; border-bottom:1px solid #7a5838; padding:5px 10px 20px;
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11px; color:#4a2808; z-index:10;
   position:relative; }
-#tune b { color:#cfe; } #tune label { display:flex; align-items:center; gap:3px; }
-#tune input { width:36px; background:#16242c; border:1px solid #283a44; color:#e8eef2; border-radius:3px; padding:2px 3px; font-size:11px; text-align:center; }
-#tune button { background:#1f6feb; color:#fff; border:none; border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
-#t_note { position:absolute; bottom:3px; left:10px; right:10px; font-size:10px; color:#5f7480; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#tune b { color:#7a1a08; font-style:italic; } #tune label { display:flex; align-items:center; gap:3px; }
+#tune input { width:36px; background:#f5ead0; border:1px solid #9a6840; color:#2a1808; border-radius:1px; padding:2px 3px; font-size:11px; text-align:center; }
+#tune button { background:#7a1a08; color:#f5e0c0; border:none; border-radius:1px; padding:3px 8px; cursor:pointer; font-size:11px; }
+#t_note { position:absolute; bottom:3px; left:10px; right:10px; font-size:10px; color:#7a5838; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 #gameArea { flex:1; width:100%; max-width:480px; position:relative; }
 #stage { width:100%; height:100%; display:block; }
 
 #hud { position:absolute; top:0; left:0; right:0; padding:8px 12px; display:flex; justify-content:flex-end; align-items:flex-start; pointer-events:none; z-index:5; }
-.hud-card { background:#0a0f12dd; border:1px solid #1f2c34; border-radius:8px; padding:6px 10px; pointer-events:auto; }
+.hud-card { background:#ede0c4cc; border:1px solid #7a5838; border-radius:0; padding:6px 10px; pointer-events:auto; }
 .hud-val { font-size:20px; font-weight:800; line-height:1; }
-.hud-val.gold { color:#ffd24a; } .hud-val.red { color:#ff5a5a; } .hud-val.blue { color:#4a9eff; }
-.hud-lbl { font-size:10px; color:#6f8593; }
-.hud-bar { height:6px; border-radius:3px; background:#1c2a33; margin-top:3px; min-width:60px; }
-.hud-bar-fill { height:100%; border-radius:3px; transition:width .3s; }
+.hud-val.gold { color:#8b6200; } .hud-val.red { color:#7a1a08; } .hud-val.blue { color:#1133aa; }
+.hud-lbl { font-size:10px; color:#5a3818; }
+.hud-bar { height:6px; border-radius:1px; background:#d4c4a0; margin-top:3px; min-width:60px; }
+.hud-bar-fill { height:100%; border-radius:1px; transition:width .3s; }
 
-#mergeHint { position:absolute; top:60px; left:50%; transform:translateX(-50%); background:#ffd24a;
-  color:#0e1418; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:700;
-  pointer-events:auto; cursor:pointer; display:none; z-index:5; box-shadow:0 4px 12px #0004; }
+#mergeHint { position:absolute; top:60px; left:50%; transform:translateX(-50%); background:#8b6200;
+  color:#f5e0c0; padding:6px 16px; border-radius:2px; font-size:13px; font-weight:700;
+  pointer-events:auto; cursor:pointer; display:none; z-index:5; box-shadow:0 4px 12px #0002; }
 
-#gameOverlay { position:absolute; inset:0; background:#0008; display:none; justify-content:center; align-items:center; z-index:20; }
-#gameOverlay .go-text { color:#ff3333; font-size:36px; font-weight:800; text-shadow:0 3px 12px #000; }
-#gameOverlay button { margin-top:16px; background:#1f6feb; color:#fff; border:none; border-radius:8px; padding:10px 24px; font-size:16px; cursor:pointer; }
+#gameOverlay { position:absolute; inset:0; background:#ede0c488; display:none; justify-content:center; align-items:center; z-index:20; }
+#gameOverlay .go-text { color:#7a1a08; font-size:36px; font-weight:800; text-shadow:0 3px 12px #0002; }
+#gameOverlay button { margin-top:16px; background:#7a1a08; color:#f5e0c0; border:none; border-radius:2px; padding:10px 24px; font-size:16px; cursor:pointer; }
 
 /* 选择面板 */
-#pickOverlay { position:absolute; inset:0; background:#000a; display:none; justify-content:center; align-items:center; z-index:25; flex-direction:column; padding:16px 0; overflow-y:auto; }
-#pickTitle { color:#ffd24a; font-size:18px; font-weight:800; margin-bottom:10px; text-shadow:0 2px 8px #000; }
+#pickOverlay { position:absolute; inset:0; background:#ede0c4ee; display:none; justify-content:center; align-items:center; z-index:25; flex-direction:column; padding:16px 0; overflow-y:auto; }
+#pickTitle { color:#7a1a08; font-size:18px; font-weight:800; margin-bottom:10px; text-shadow:none; }
 #pickOptions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; padding:0 12px; width:100%; align-items:flex-start;
   transform:translateY(20px); opacity:0; transition:transform .25s ease-out, opacity .2s; }
 #pickOptions.anim-in { transform:translateY(0); opacity:1; }
@@ -48,14 +48,14 @@ body { display:flex; flex-direction:column; align-items:center; }
 /* 基地升级动画层 */
 #baseLevelAnim { position:absolute; inset:0; display:none; justify-content:center; align-items:center;
   flex-direction:column; z-index:28; pointer-events:none;
-  background:radial-gradient(circle at 50% 65%, #ffd24a18 0%, transparent 65%); }
-.bla-ring { position:absolute; border-radius:50%; border:3px solid #ffd24a; width:40px; height:40px;
+  background:radial-gradient(circle at 50% 65%, #8b620018 0%, transparent 65%); }
+.bla-ring { position:absolute; border-radius:50%; border:3px solid #8b6200; width:40px; height:40px;
   animation:blaRingExpand .9s ease-out forwards; }
-.bla-ring2 { animation-delay:.15s; border-color:#ffd24a88; }
-.bla-title { font-size:42px; font-weight:900; color:#ffd24a; letter-spacing:2px;
-  text-shadow:0 0 24px #ffd24a99, 0 2px 8px #000;
+.bla-ring2 { animation-delay:.15s; border-color:#8b620088; }
+.bla-title { font-size:42px; font-weight:900; color:#7a1a08; letter-spacing:2px;
+  text-shadow:0 0 24px #8b620055, 0 2px 8px #0002;
   animation:blaTextPop .45s cubic-bezier(.18,1.4,.6,1) forwards; }
-.bla-sub { font-size:16px; color:#ffe899; margin-top:6px; letter-spacing:1px;
+.bla-sub { font-size:16px; color:#4a2808; margin-top:6px; letter-spacing:1px;
   animation:blaTextPop .45s .1s cubic-bezier(.18,1.4,.6,1) both; }
 @keyframes blaRingExpand { from{width:40px;height:40px;opacity:.9} to{width:240px;height:240px;opacity:0} }
 @keyframes blaTextPop { from{transform:scale(.5);opacity:0} to{transform:scale(1);opacity:1} }
@@ -63,85 +63,85 @@ body { display:flex; flex-direction:column; align-items:center; }
 /* 四级武将降临动画层 */
 #maxGenAnim { position:absolute; inset:0; display:none; justify-content:center; align-items:center;
   flex-direction:column; z-index:28; pointer-events:none; }
-.mga-flash { position:absolute; inset:0; background:#ffd24a; animation:mgaFlash .18s ease-out forwards; }
-.mga-banner { background:linear-gradient(135deg,#1a2a10,#2a4015); border:2px solid #ffd24a;
-  border-radius:14px; padding:10px 28px; text-align:center;
+.mga-flash { position:absolute; inset:0; background:#8b6200; animation:mgaFlash .18s ease-out forwards; }
+.mga-banner { background:linear-gradient(135deg,#e8d8b8,#f5ead0); border:2px solid #8b6200;
+  border-radius:2px; padding:10px 28px; text-align:center;
   animation:mgaBannerPop .35s cubic-bezier(.18,1.4,.6,1) forwards; }
-.mga-name { font-size:28px; font-weight:900; color:#ffd24a; text-shadow:0 0 16px #ffd24a88; }
-.mga-label { font-size:14px; color:#ffe899; margin-top:2px; letter-spacing:2px; }
+.mga-name { font-size:28px; font-weight:900; color:#7a1a08; text-shadow:0 0 16px #8b620044; }
+.mga-label { font-size:14px; color:#4a2808; margin-top:2px; letter-spacing:2px; }
 @keyframes mgaFlash { from{opacity:.35} to{opacity:0} }
 @keyframes mgaBannerPop { from{transform:scale(.6) translateY(-16px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
-.pick-card { background:#16242c; border:2px solid #2c3f4b; border-radius:10px; padding:8px 10px; flex:1; min-width:88px; max-width:120px;
+.pick-card { background:#e8d8b8; border:1px solid #9a7848; border-radius:2px; padding:8px 10px; flex:1; min-width:88px; max-width:120px;
   cursor:pointer; text-align:center; transition:all .15s; }
-.pick-card:hover { border-color:#ffd24a; transform:scale(1.06); }
+.pick-card:hover { border-color:#8b6200; transform:scale(1.06); }
 .pick-icon { font-size:20px; margin-bottom:3px; }
-.pick-name { font-size:14px; font-weight:700; color:#e8eef2; }
-.pick-desc { font-size:11px; color:#8fa6b2; margin-top:3px; }
+.pick-name { font-size:14px; font-weight:700; color:#2a1808; }
+.pick-desc { font-size:11px; color:#4a2808; margin-top:3px; }
 
 /* 战前选将 */
-#draftOverlay { position:absolute; inset:0; background:#0e1418f0; display:none; flex-direction:column;
+#draftOverlay { position:absolute; inset:0; background:#ede0c4f5; display:none; flex-direction:column;
   justify-content:center; align-items:center; z-index:30; padding:16px; overflow-y:auto; }
-#draftTitle { color:#ffd24a; font-size:22px; font-weight:800; margin-bottom:4px; }
-#draftDesc { color:#8fa6b2; font-size:12px; margin-bottom:16px; }
+#draftTitle { color:#7a1a08; font-size:22px; font-weight:800; margin-bottom:4px; }
+#draftDesc { color:#4a2808; font-size:12px; margin-bottom:16px; }
 #draftGrid { display:flex; flex-direction:column; gap:12px; width:100%; max-width:420px; }
 .draft-row { display:flex; flex-direction:column; gap:6px; }
-.draft-row-title { font-size:12px; color:#6f8593; font-weight:700; padding-left:4px; }
+.draft-row-title { font-size:12px; color:#7a5838; font-weight:700; padding-left:4px; }
 .draft-row-cards { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
-.draft-card { background:#16242c; border:2px solid #2c3f4b; border-radius:10px; padding:6px 8px;
+.draft-card { background:#e8d8b8; border:1px solid #9a7848; border-radius:2px; padding:6px 8px;
   min-width:56px; max-width:80px; cursor:pointer; text-align:center; transition:all .15s; position:relative; }
-.draft-card:hover { border-color:#4a9eff; transform:scale(1.04); }
-.draft-card.selected { border-color:#ffd24a; background:#1f2e1a; box-shadow:0 0 12px #ffd24a44; }
+.draft-card:hover { border-color:#1133aa; transform:scale(1.04); }
+.draft-card.selected { border-color:#8b6200; background:#d8c8a0; box-shadow:0 0 12px #8b620033; }
 .draft-card .pick-icon { font-size:18px; }
 .draft-card .pick-name { font-size:13px; }
 .draft-card .pick-desc { font-size:10px; }
-.recommend-badge { position:absolute; top:-1px; right:-1px; background:#ffd24a; color:#000; font-size:7px; font-weight:800; padding:1px 4px; border-radius:0 10px 0 6px; line-height:1.8; pointer-events:none; }
-#draftStart { margin-top:16px; background:#1f6feb; color:#fff; border:none; border-radius:8px;
+.recommend-badge { position:absolute; top:-1px; right:-1px; background:#8b6200; color:#f5e0c0; font-size:7px; font-weight:800; padding:1px 4px; border-radius:0 2px 0 2px; line-height:1.8; pointer-events:none; }
+#draftStart { margin-top:16px; background:#7a1a08; color:#f5e0c0; border:none; border-radius:2px;
   padding:12px 32px; font-size:16px; font-weight:700; cursor:pointer; transition:all .15s; }
-#draftStart:hover { background:#3a8aff; transform:scale(1.05); }
-#draftStart:disabled { background:#333; color:#666; cursor:not-allowed; transform:none; }
+#draftStart:hover { background:#9a2a10; transform:scale(1.05); }
+#draftStart:disabled { background:#c8b890; color:#7a5838; cursor:not-allowed; transform:none; }
 
-#winOverlay { position:absolute; inset:0; background:#0008; display:none; justify-content:center; align-items:center; z-index:20; }
-#winOverlay .win-text { color:#ffd24a; font-size:32px; font-weight:800; text-shadow:0 3px 12px #000; }
-#winOverlay .win-sub { color:#8fa6b2; font-size:14px; margin:8px 0 16px; }
-.win-stats { background:#0a1418; border:1px solid #1f3040; border-radius:10px; padding:10px 14px; margin:0 0 14px; text-align:left; min-width:220px; }
-.ws-title { color:#ffd24a; font-size:12px; font-weight:800; margin-bottom:8px; text-align:center; }
-.ws-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid #1a2830; }
+#winOverlay { position:absolute; inset:0; background:#ede0c488; display:none; justify-content:center; align-items:center; z-index:20; }
+#winOverlay .win-text { color:#7a1a08; font-size:32px; font-weight:800; text-shadow:0 3px 12px #0001; }
+#winOverlay .win-sub { color:#4a2808; font-size:14px; margin:8px 0 16px; }
+.win-stats { background:#e8d8b8; border:1px solid #9a7848; border-radius:2px; padding:10px 14px; margin:0 0 14px; text-align:left; min-width:220px; }
+.ws-title { color:#7a1a08; font-size:12px; font-weight:800; margin-bottom:8px; text-align:center; }
+.ws-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid #9a7848; }
 .ws-row:last-child { border-bottom:none; }
-.ws-name { color:#e0e8ec; font-size:12px; font-weight:700; margin-right:8px; }
-.ws-nums { color:#8fa6b2; font-size:11px; white-space:nowrap; }
-.ws-pct { color:#4affff; font-weight:700; }
-#guideHint { position:absolute; top:52px; left:50%; transform:translateX(-50%); background:#4affff18; border:1px solid #4affff66; color:#4affff; padding:6px 16px; border-radius:20px; font-size:12px; font-weight:700; pointer-events:none; display:none; z-index:5; white-space:nowrap; }
+.ws-name { color:#2a1808; font-size:12px; font-weight:700; margin-right:8px; }
+.ws-nums { color:#4a2808; font-size:11px; white-space:nowrap; }
+.ws-pct { color:#1133aa; font-weight:700; }
+#guideHint { position:absolute; top:52px; left:50%; transform:translateX(-50%); background:#1133aa11; border:1px solid #1133aa66; color:#1133aa; padding:6px 16px; border-radius:2px; font-size:12px; font-weight:700; pointer-events:none; display:none; z-index:5; white-space:nowrap; }
 
-#hpHud { width:100%; max-width:480px; background:#0a0f12f0; border-top:2px solid #1f2c34; padding:7px 14px 10px; padding-bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) + 10px)); display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+#hpHud { width:100%; max-width:480px; background:#e8d8b8f0; border-top:2px solid #7a5838; padding:7px 14px 10px; padding-bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) + 10px)); display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
 .bhud-row { display:flex; align-items:center; gap:8px; }
-#hpHud .hp-lbl { font-size:11px; color:#8fa6b2; white-space:nowrap; }
-#hpHud .hp-val { font-size:18px; font-weight:800; color:#ff5a5a; white-space:nowrap; line-height:1; min-width:40px; }
-#hpHud .hp-track { flex:1; height:12px; border-radius:6px; background:#1c2a33; overflow:hidden; }
-#hpHud .hp-fill { height:100%; border-radius:6px; background:linear-gradient(90deg,#cc2222,#ff5a5a); transition:width .3s; }
-#hpHud .hp-max { font-size:11px; color:#6f8593; white-space:nowrap; }
+#hpHud .hp-lbl { font-size:11px; color:#4a2808; white-space:nowrap; }
+#hpHud .hp-val { font-size:18px; font-weight:800; color:#7a1a08; white-space:nowrap; line-height:1; min-width:40px; }
+#hpHud .hp-track { flex:1; height:12px; border-radius:2px; background:#d4c4a0; overflow:hidden; }
+#hpHud .hp-fill { height:100%; border-radius:2px; background:linear-gradient(90deg,#8b0000,#cc3322); transition:width .3s; }
+#hpHud .hp-max { font-size:11px; color:#7a5838; white-space:nowrap; }
 /* 底部进度行 */
-.bp-sep { width:1px; height:20px; background:#1f2c34; flex-shrink:0; }
-.bp-lvl-lbl { font-size:10px; color:#6f8593; white-space:nowrap; }
-.bp-lvl-val { font-size:15px; font-weight:800; color:#ffd24a; line-height:1; }
-.bp-bar { width:52px; height:5px; border-radius:3px; background:#1c2a33; overflow:hidden; flex-shrink:0; }
-.bp-bar-fill { height:100%; border-radius:3px; background:#ffd24a; transition:width .3s; }
-.bp-hint { flex:1; font-size:10px; color:#ffd24a88; white-space:nowrap; }
-.bp-pow-lbl { font-size:10px; color:#6f8593; }
-.bp-pow-val { font-size:12px; font-weight:700; color:#4a9eff; }
-.bp-sum-lbl { font-size:10px; color:#6f8593; }
-.bp-sum-val { font-size:15px; font-weight:800; color:#ffd24a; line-height:1; }
-.bp-sum-sub { font-size:10px; color:#6f8593; }
+.bp-sep { width:1px; height:20px; background:#9a7848; flex-shrink:0; }
+.bp-lvl-lbl { font-size:10px; color:#4a2808; white-space:nowrap; }
+.bp-lvl-val { font-size:15px; font-weight:800; color:#8b6200; line-height:1; }
+.bp-bar { width:52px; height:5px; border-radius:1px; background:#d4c4a0; overflow:hidden; flex-shrink:0; }
+.bp-bar-fill { height:100%; border-radius:1px; background:#8b6200; transition:width .3s; }
+.bp-hint { flex:1; font-size:10px; color:#8b620088; white-space:nowrap; }
+.bp-pow-lbl { font-size:10px; color:#4a2808; }
+.bp-pow-val { font-size:12px; font-weight:700; color:#1133aa; }
+.bp-sum-lbl { font-size:10px; color:#4a2808; }
+.bp-sum-val { font-size:15px; font-weight:800; color:#8b6200; line-height:1; }
+.bp-sum-sub { font-size:10px; color:#7a5838; }
 /* 强化槽位栏（右侧纵列） */
 #buffBar { position:absolute; right:4px; top:90px; display:flex; flex-direction:column; gap:6px; z-index:6; }
-.buff-chip { background:#0e1e28cc; border:1px solid #2c4454; border-radius:6px; padding:4px 7px; font-size:12px; color:#b8d4e2; white-space:nowrap; display:flex; align-items:center; gap:3px; cursor:pointer; }
-.buff-chip:hover { border-color:#5a9dc5; background:#1a3040cc; }
+.buff-chip { background:#e8d8b8cc; border:1px solid #9a7848; border-radius:2px; padding:4px 7px; font-size:12px; color:#4a2808; white-space:nowrap; display:flex; align-items:center; gap:3px; cursor:pointer; }
+.buff-chip:hover { border-color:#8b6200; background:#d8c8a0cc; }
 .buff-chip .bc-icon { font-size:14px; }
-.buff-chip .bc-count { font-size:11px; color:#8fc8e0; }
-#buffDetail { display:none; position:absolute; right:76px; top:90px; background:#0e1e28ee; border:1px solid #3a6070; border-radius:8px; padding:8px 10px; z-index:7; min-width:130px; }
-#buffDetail .bd-title { font-size:13px; color:#5ac8fa; font-weight:bold; margin-bottom:5px; }
-#buffDetail .bd-item { font-size:11px; color:#b8d4e2; padding:2px 0; border-bottom:1px solid #1e3040; }
+.buff-chip .bc-count { font-size:11px; color:#7a5838; }
+#buffDetail { display:none; position:absolute; right:76px; top:90px; background:#ede0c4ee; border:1px solid #9a7848; border-radius:2px; padding:8px 10px; z-index:7; min-width:130px; }
+#buffDetail .bd-title { font-size:13px; color:#7a1a08; font-weight:bold; margin-bottom:5px; }
+#buffDetail .bd-item { font-size:11px; color:#4a2808; padding:2px 0; border-bottom:1px solid #9a7848; }
 #buffDetail .bd-item:last-of-type { border-bottom:none; }
-#buffDetail .bd-close { font-size:10px; color:#5a8a9a; cursor:pointer; text-align:right; margin-top:4px; }
+#buffDetail .bd-close { font-size:10px; color:#7a5838; cursor:pointer; text-align:right; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -172,7 +172,7 @@ body { display:flex; flex-direction:column; align-items:center; }
     <button id="draftStart">开始战斗</button>
   </div>
   <div id="gameOverlay"><div style="text-align:center"><div class="go-text">基地陷落</div><button id="btnRestart2">重开</button></div></div>
-  <div id="winOverlay"><div style="text-align:center"><div class="win-text">🎉 通关！</div><div class="win-sub">撑过 15 波，大获全胜 · 难度 <span id="difficultyEl">1</span></div><div id="winStats" class="win-stats"></div><div style="display:flex;gap:10px;justify-content:center"><button id="btnRestart3" style="background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:16px;cursor:pointer;">再战一局</button><button id="btnNextDiff" style="background:#2ea043;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:16px;cursor:pointer;">下一难度</button></div></div></div>
+  <div id="winOverlay"><div style="text-align:center"><div class="win-text">🎉 通关！</div><div class="win-sub">撑过 15 波，大获全胜 · 难度 <span id="difficultyEl">1</span></div><div id="winStats" class="win-stats"></div><div style="display:flex;gap:10px;justify-content:center"><button id="btnRestart3" style="background:#7a1a08;color:#f5e0c0;border:none;border-radius:2px;padding:10px 24px;font-size:16px;cursor:pointer;">再战一局</button><button id="btnNextDiff" style="background:#2a5a18;color:#f5e0c0;border:none;border-radius:2px;padding:10px 24px;font-size:16px;cursor:pointer;">下一难度</button></div></div></div>
   <div id="guideHint"></div>
   <!-- 强化槽位（右侧纵列，最多5个：4将+少年） -->
   <div id="buffBar"></div>
@@ -238,8 +238,8 @@ const START_GOLD = 100;
 
 // ===== 建筑（进攻=出兵，防守=站桩远程） =====
 const B_TYPES = [
-  { key:'advance', name:'进攻', hex:0xff5a5a, css:'#ff5a5a', glyph:'⚔', range:2.0, dps:6, troopSpd:0.33 },
-  { key:'defense', name:'防守', hex:0x4a9eff, css:'#4a9eff', glyph:'◈', range:2.4, dps:4 },
+  { key:'advance', name:'进攻', hex:0xcc3322, css:'#cc3322', glyph:'⚔', range:2.0, dps:6, troopSpd:0.33 },
+  { key:'defense', name:'防守', hex:0x1133aa, css:'#1133aa', glyph:'◈', range:2.4, dps:4 },
 ];
 
 // ===== 武将池（进攻：产亲兵出征；防守：站桩远程输出） =====
@@ -295,7 +295,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.troopSplash_guanyu=true; }},
     { key:'guanyu_b', name:'关羽·武圣', desc:'每次产兵时激励全军，8秒内每批次产兵全体亲兵伤害+8%（最多3层+24%）', icon:'👑',
       apply: g=>{ g.presenceBuff_guanyu=true; }},
-    { key:'guanyu_morale', name:'士气高涨', desc:'关羽攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'guanyu_morale', name:'关羽·锋锐', desc:'关羽与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='guanyu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhangfei: [
@@ -303,7 +303,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.aoeRadiusMul_zhangfei=2; }},
     { key:'zhangfei_b', name:'张飞·火爆', desc:'AOE命中的敌人获得灼烧标记，2秒内每0.5秒受AOE伤害30%的持续伤害', icon:'🔥',
       apply: g=>{ g.aoeBurn_zhangfei=true; }},
-    { key:'zhangfei_morale', name:'士气高涨', desc:'张飞攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'zhangfei_morale', name:'张飞·大喝', desc:'张飞与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhangfei') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhaoyun: [
@@ -311,7 +311,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.tripleStrike_zhaoyun=true; }},
     { key:'zhaoyun_b', name:'赵云·七进七出', desc:'亲兵攻速×1.5', icon:'⚡',
       apply: g=>{ g.troopAtkSpd_zhaoyun=1.5; }},
-    { key:'zhaoyun_morale', name:'士气高涨', desc:'赵云攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'zhaoyun_morale', name:'赵云·龙魂', desc:'赵云与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhaoyun') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   ganning: [
@@ -319,7 +319,7 @@ const GENERAL_UPGRADES = {
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='ganning') cell.general=Object.assign({},cell.general,{multishot:4}); }},
     { key:'ganning_b', name:'甘宁·奇袭', desc:'甘宁亲兵击杀时，对最近另一敌人造成50%伤害', icon:'🎯',
       apply: g=>{ g.ganningChain=true; }},
-    { key:'ganning_morale', name:'士气高涨', desc:'甘宁攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'ganning_morale', name:'甘宁·锦帆', desc:'甘宁与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='ganning') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   taishici: [
@@ -327,7 +327,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.pierce_taishici=3; }},
     { key:'taishici_b', name:'太史慈·鸣镝', desc:'每4发蓄力，第5发伤害×2弹速×3', icon:'🎯',
       apply: g=>{ g.mingdi_taishici=true; }},
-    { key:'taishici_morale', name:'士气高涨', desc:'太史慈攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'taishici_morale', name:'太史慈·迅矢', desc:'太史慈普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='taishici') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   // ── 防守将 ──
@@ -336,7 +336,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.scatter_huangzhong=3; }},
     { key:'huangzhong_b', name:'黄忠·百步穿心', desc:'暴击率+25%，暴击×5', icon:'💥',
       apply: g=>{ g.critChance_huangzhong=(g.critChance_huangzhong||0)+0.25; g.critMul_huangzhong=5; }},
-    { key:'huangzhong_morale', name:'士气高涨', desc:'黄忠攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'huangzhong_morale', name:'黄忠·神射', desc:'黄忠普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='huangzhong') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhugeliang: [
@@ -344,7 +344,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.slowAoe_zhugeliang=true; }},
     { key:'zhugeliang_b', name:'诸葛亮·木牛', desc:'减速效果提升到80%', icon:'🐂',
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhugeliang') cell.general=Object.assign({},cell.general,{slow:0.2}); }},
-    { key:'zhugeliang_morale', name:'士气高涨', desc:'诸葛亮攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'zhugeliang_morale', name:'诸葛亮·机算', desc:'诸葛亮普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhugeliang') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhouyu: [
@@ -352,7 +352,7 @@ const GENERAL_UPGRADES = {
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhouyu') cell.general=Object.assign({},cell.general,{chain:5}); }},
     { key:'zhouyu_b', name:'周瑜·子弹道', desc:'命中时分裂出2条50%伤害飞弹', icon:'✦',
       apply: g=>{ g.splitProj_zhouyu=true; }},
-    { key:'zhouyu_morale', name:'士气高涨', desc:'周瑜攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'zhouyu_morale', name:'周瑜·英姿', desc:'周瑜普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhouyu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   simayi: [
@@ -360,7 +360,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.stormExpand_simayi=true; }},
     { key:'simayi_b', name:'司马懿·落雷', desc:'每次雷暴有15%概率触发落雷，对单体造成×5伤害', icon:'⚡',
       apply: g=>{ g.stormBolt_simayi=true; }},
-    { key:'simayi_morale', name:'士气高涨', desc:'司马懿攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'simayi_morale', name:'司马懿·谋深', desc:'司马懿普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='simayi') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   caoren: [
@@ -368,7 +368,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.tauntRangeMul_caoren=2; }},
     { key:'caoren_b', name:'曹仁·镇慑', desc:'被嘲讽敌人攻速-40%（攻击间隔×1.67）', icon:'🛡',
       apply: g=>{ g.tauntAtkSlow_caoren=true; }},
-    { key:'caoren_morale', name:'士气高涨', desc:'曹仁攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'caoren_morale', name:'曹仁·铁骨', desc:'曹仁与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='caoren') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   xuchu: [
@@ -376,7 +376,7 @@ const GENERAL_UPGRADES = {
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='xuchu') cell.general=Object.assign({},cell.general,{stun:0.6}); }},
     { key:'xuchu_b', name:'许褚·军法', desc:'击晕时扩散：周围敌人30%概率连带被晕1秒', icon:'⛓',
       apply: g=>{ g.stunSpread_xuchu=true; }},
-    { key:'xuchu_morale', name:'士气高涨', desc:'许褚攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'xuchu_morale', name:'许褚·猛劲', desc:'许褚与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='xuchu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   dianwei: [
@@ -384,7 +384,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.burnRadiusMul_dianwei=1.6; g.burnDpsMul_dianwei=1.5; g.fireZone_dianwei=true; }},
     { key:'dianwei_b', name:'典韦·殉燃', desc:'亲兵阵亡时火海持续时间+5秒，并减慢范围内敌人移速60%', icon:'🌋',
       apply: g=>{ g.deathFireBoost_dianwei=true; }},
-    { key:'dianwei_morale', name:'士气高涨', desc:'典韦攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'dianwei_morale', name:'典韦·虎威', desc:'典韦与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='dianwei') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   lubu: [
@@ -392,7 +392,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.chargeWidthMul_lubu=1.5; g.chargeDmgMul_lubu=1.5; }},
     { key:'lubu_b', name:'吕布·方天画戟', desc:'主目标伤害×1.5，冲阵穿透敌人被击退1格', icon:'⚔',
       apply: g=>{ g.chargeKnockback_lubu=true; }},
-    { key:'lubu_morale', name:'士气高涨', desc:'吕布攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'lubu_morale', name:'吕布·无双', desc:'吕布与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='lubu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   pangtong: [
@@ -400,7 +400,7 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.boltExplode_pangtong=true; }},
     { key:'pangtong_b', name:'庞统·连璧', desc:'连锁次数+4（共8次弹射）', icon:'⚡',
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='pangtong') cell.general=Object.assign({},cell.general,{chain:8}); }},
-    { key:'pangtong_morale', name:'士气高涨', desc:'庞统攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+    { key:'pangtong_morale', name:'庞统·凤鸣', desc:'庞统普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='pangtong') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
 };
@@ -485,8 +485,8 @@ function buildBgHexGrid() {
     for(let r=rMin; r<=rMax; r++) {
       const px = cx + q * HEX_COL;
       const py = cy + HEX_ROW * (r + q * 0.5);
-      g.lineStyle(1, 0x1e3848, 0.7);
-      g.beginFill(0x0c1a24, 0.95);
+      g.lineStyle(1, 0x8a6030, 0.5);
+      g.beginFill(0xd5c8a8, 0.92);
       g.drawPolygon(hexPoly(px, py, HEX_SIZE - 1));
       g.endFill();
     }
@@ -784,7 +784,7 @@ function drawLanes(){
   // 三路淡色通道
   const laneHalf = (LANES[1]-LANES[0]) * 0.46;
   for(const lx of LANES){
-    g.beginFill(0x16242c, 0.5);
+    g.beginFill(0xc8b080, 0.25);
     g.drawRoundedRect(lx-laneHalf, -HEX_SIZE, laneHalf*2, LANE_MERGE_Y+HEX_SIZE, 10);
     g.endFill();
   }
@@ -796,33 +796,42 @@ function drawLanes(){
     for(let r = rMin; r <= rMax; r++){
       const bpy = HEX_ROW * (r + bq*0.5) + cy;
       if(bpy < -HEX_SIZE || bpy > LANE_MERGE_Y - HEX_ROW*2) continue;
-      g.beginFill(0x18303d, 0.95);
-      g.lineStyle(1.5, 0x2a5060, 0.8);
+      g.beginFill(0xc8b888, 0.92);
+      g.lineStyle(1.5, 0x7a5838, 0.7);
       g.drawPolygon(hexPoly(bpx, bpy, HEX_SIZE - 1));
       g.endFill(); g.lineStyle(0);
-      g.beginFill(0x3d6878, 0.7); g.drawCircle(bpx, bpy, 5); g.endFill();
-      g.beginFill(0x3d6878, 0.4); g.drawCircle(bpx-9, bpy+7, 3); g.endFill();
-      g.beginFill(0x3d6878, 0.35); g.drawCircle(bpx+8, bpy-6, 2.5); g.endFill();
+      g.beginFill(0x5a3820, 0.5); g.drawCircle(bpx, bpy, 5); g.endFill();
+      g.beginFill(0x5a3820, 0.3); g.drawCircle(bpx-9, bpy+7, 3); g.endFill();
+      g.beginFill(0x5a3820, 0.25); g.drawCircle(bpx+8, bpy-6, 2.5); g.endFill();
     }
   }
   // 汇聚提示线
-  g.lineStyle(1.5, 0x4a6a7a, 0.35);
+  g.lineStyle(1.5, 0x7a5838, 0.3);
   g.moveTo(LANES[0]-laneHalf, LANE_MERGE_Y); g.lineTo(LANES[2]+laneHalf, LANE_MERGE_Y);
   g.lineStyle(0);
-  // 传送门：左路(LANES[0])蓝色 + 右路(LANES[2])橙红 + 中路绿色（下移2格）
-  const portalY = HEX_SIZE * 2;
-  const pr = HEX_SIZE * 0.8; // 缩小至六边形格内（内切圆半径≈HEX_SIZE*0.87，留少量间距）
-  // 左路传送门
-  g.lineStyle(3, 0x44aaff, 0.85); g.beginFill(0x44aaff, 0.12); g.drawCircle(LANES[0], portalY, pr); g.endFill(); g.lineStyle(0);
-  g.lineStyle(2, 0x44aaff, 0.5); g.drawCircle(LANES[0], portalY, pr*0.5); g.lineStyle(0);
-  // 右路传送门
-  g.lineStyle(3, 0xff5533, 0.85); g.beginFill(0xff5533, 0.12); g.drawCircle(LANES[2], portalY, pr); g.endFill(); g.lineStyle(0);
-  g.lineStyle(2, 0xff5533, 0.5); g.drawCircle(LANES[2], portalY, pr*0.5); g.lineStyle(0);
-  // 中路传送门（绿色，与左右路同高）
-  const cPortalY = HEX_SIZE*2.5;
-  g.lineStyle(3, 0x44ff99, 0.85); g.beginFill(0x44ff99, 0.1); g.drawCircle(cx, cPortalY, pr); g.endFill(); g.lineStyle(0);
-  g.lineStyle(2, 0x44ff99, 0.45); g.drawCircle(cx, cPortalY, pr*0.5); g.lineStyle(0);
-  worldC.addChild(g);
+  // 出兵门：三路网格对齐六边形（取代圆形传送门）
+  const portalDefs = [
+    {q: -3, color: 0x1133aa, css: '#1133aa', label: '水'},
+    {q:  0, color: 0x2d7a2d, css: '#2d7a2d', label: '木'},
+    {q:  3, color: 0xcc3322, css: '#cc3322', label: '火'},
+  ];
+  const portalTargetY = HEX_SIZE * 2.5;
+  const laneContainer = new PIXI.Container();
+  laneContainer.addChild(g);
+  for(const pd of portalDefs){
+    const rExact = (portalTargetY - cy) / HEX_ROW - pd.q * 0.5;
+    const r = Math.round(rExact);
+    const ppx = cx + pd.q * HEX_COL;
+    const ppy = cy + HEX_ROW * (r + pd.q * 0.5);
+    g.beginFill(pd.color, 0.12); g.lineStyle(2.5, pd.color, 0.9);
+    g.drawPolygon(hexPoly(ppx, ppy, HEX_SIZE - 1)); g.endFill(); g.lineStyle(0);
+    g.lineStyle(1.5, pd.color, 0.35);
+    g.drawPolygon(hexPoly(ppx, ppy, Math.round(HEX_SIZE * 0.48))); g.lineStyle(0);
+    const lt = new PIXI.Text(pd.label, {fontSize: 14, fill: pd.css, fontWeight: '900'});
+    lt.anchor.set(0.5); lt.x = ppx; lt.y = ppy;
+    laneContainer.addChild(lt);
+  }
+  worldC.addChild(laneContainer);
 }
 
 function drawWall(){
@@ -832,7 +841,7 @@ function drawWall(){
   if(!outerCells.length) return;
   let minX=Infinity,maxX=-Infinity,minY=Infinity;
   for(const c of outerCells){ minX=Math.min(minX,c.px); maxX=Math.max(maxX,c.px); minY=Math.min(minY,c.py); }
-  const wallColor = wallFlash > 0 ? 0xff3333 : 0x4a6a7a;
+  const wallColor = wallFlash > 0 ? 0xcc3322 : 0x7a5838;
   const wallAlpha = wallFlash > 0 ? 0.8 : 0.5;
   const pad = HEX_SIZE + 8;
   const wcx = (minX+maxX)/2, wTop = minY - pad, wBottom = cy + pad/2;
@@ -840,10 +849,15 @@ function drawWall(){
   wallGfx.lineStyle(3, wallColor, wallAlpha);
   wallGfx.moveTo(wcx - wHalf, wBottom);
   wallGfx.bezierCurveTo(wcx - wHalf, wTop - 20, wcx + wHalf, wTop - 20, wcx + wHalf, wBottom);
-  // 底部横杆
+  // 底部横杆 + 角楼（明确城垣语义）
   wallGfx.lineStyle(4, wallColor, wallAlpha * 0.7);
   wallGfx.moveTo(wcx - wHalf - 5, wBottom + 4);
   wallGfx.lineTo(wcx + wHalf + 5, wBottom + 4);
+  wallGfx.lineStyle(0);
+  wallGfx.beginFill(wallColor, wallAlpha * 0.75);
+  wallGfx.drawRect(wcx - wHalf - 13, wBottom - 1, 9, 13);
+  wallGfx.drawRect(wcx + wHalf + 5, wBottom - 1, 9, 13);
+  wallGfx.endFill();
 }
 
 function drawCell(cell){
@@ -854,23 +868,23 @@ function drawCell(cell){
   const poly = hexCorners(s);
 
   if(cell.state==='base'){
-    g.beginFill(0xffd24a,0.3); g.lineStyle(3,0xffd24a,0.9);
+    g.beginFill(0xc8a000,0.35); g.lineStyle(3,0x8b6200,0.9);
     g.drawPolygon(poly); g.endFill();
-    const glow=new PIXI.Graphics(); glow.lineStyle(2,0xffd24a,0.5); glow.drawCircle(0,0,HEX_SIZE+6);
+    const glow=new PIXI.Graphics(); glow.lineStyle(1.5,0x8b6200,0.45); glow.drawPolygon(hexCorners(HEX_SIZE+8));
     cell.cont.addChild(glow);
-    const t=new PIXI.Text('少',{fontSize:20,fill:'#ffd24a',fontWeight:'900'}); t.anchor.set(0.5); t.y=-5; cell.cont.addChild(t);
-    const lvlT=new PIXI.Text('Lv'+baseLvl,{fontSize:9,fill:'#ffd24a',fontWeight:'700'}); lvlT.anchor.set(0.5); lvlT.y=11; cell.cont.addChild(lvlT);
+    const t=new PIXI.Text('少',{fontSize:20,fill:'#8b6200',fontWeight:'900'}); t.anchor.set(0.5); t.y=-5; cell.cont.addChild(t);
+    const lvlT=new PIXI.Text('Lv'+baseLvl,{fontSize:9,fill:'#8b6200',fontWeight:'700'}); lvlT.anchor.set(0.5); lvlT.y=11; cell.cont.addChild(lvlT);
   } else if(cell.state==='locked'){
-    g.beginFill(0x0a0f12,0.4); g.lineStyle(1,0x151f25);
+    g.beginFill(0xb8a880,0.4); g.lineStyle(1,0x9a8868);
     g.drawPolygon(poly); g.endFill();
   } else if(cell.state==='flippable'){
-    g.beginFill(0x1c2a33); g.lineStyle(1.5,0x2c3f4b);
+    g.beginFill(0xd8c8a4); g.lineStyle(1.5,0x7a5838);
     g.drawPolygon(poly); g.endFill();
-    const t=new PIXI.Text('?',{fontSize:16,fill:'#3a5060',fontWeight:'800'}); t.anchor.set(0.5); cell.cont.addChild(t);
+    const t=new PIXI.Text('?',{fontSize:16,fill:'#5a3818',fontWeight:'800'}); t.anchor.set(0.5); cell.cont.addChild(t);
   } else if(cell.state==='empty'){
-    g.beginFill(0x1c2a33,0.5); g.lineStyle(1,0x2c3f4b,0.4);
+    g.beginFill(0xd8c8a4,0.5); g.lineStyle(1,0x7a5838,0.4);
     g.drawPolygon(poly); g.endFill();
-    const t=new PIXI.Text('↺',{fontSize:13,fill:'#3a5060'}); t.anchor.set(0.5); cell.cont.addChild(t);
+    const t=new PIXI.Text('↺',{fontSize:13,fill:'#5a3818'}); t.anchor.set(0.5); cell.cont.addChild(t);
   } else if(cell.state==='revealed'){
     const bt = B_TYPES.find(b=>b.key===cell.category) || B_TYPES[0];
     const gen = cell.general;
@@ -884,15 +898,15 @@ function drawCell(cell){
     g.drawPolygon(poly); g.endFill();
 
     if(isMaxLvl){
-      const glow=new PIXI.Graphics(); glow.lineStyle(2, bt.hex, 0.45); glow.drawCircle(0,0,HEX_SIZE+5);
+      const glow=new PIXI.Graphics(); glow.lineStyle(2, bt.hex, 0.45); glow.drawPolygon(hexCorners(HEX_SIZE+5));
       cell.cont.addChild(glow);
     }
 
     const glyph = gen ? gen.glyph : bt.glyph;
-    const glyphColor = isMaxLvl ? '#ffd24a' : bt.css;
+    const glyphColor = isMaxLvl ? '#8b6200' : bt.css;
     const t=new PIXI.Text(glyph,{fontSize:16,fill:glyphColor,fontWeight:'800'}); t.anchor.set(0.5); t.y=-4; cell.cont.addChild(t);
     const label = isMaxLvl ? gen.name : 'Lv'+cell.lvl+' '+(gen?gen.name:'');
-    const labelColor = isMaxLvl ? '#ffd24a' : '#ccc';
+    const labelColor = isMaxLvl ? '#8b6200' : '#3a2008';
     const lvlT=new PIXI.Text(label,{fontSize:9,fill:labelColor,fontWeight:'600'}); lvlT.anchor.set(0.5); lvlT.y=12; cell.cont.addChild(lvlT);
 
     // 等级点（Lv2=2点, Lv3=3点，帮助辨认合成目标）
@@ -907,13 +921,13 @@ function drawCell(cell){
     // 常驻合成提示：场上存在同将同级可配对时显示黄色外框
     const canMerge = !isMaxLvl && hexCells.some(c=>c!==cell&&c.state==='revealed'&&c.lvl===cell.lvl&&c.building===cell.building&&c.lvl<TUNE.maxLvl);
     if(canMerge){
-      const mg=new PIXI.Graphics(); mg.lineStyle(2,0xffdd00,0.75); mg.drawPolygon(hexCorners(HEX_SIZE+3));
+      const mg=new PIXI.Graphics(); mg.lineStyle(3,0x8b6200,1.0); mg.drawPolygon(hexCorners(HEX_SIZE+4));
       mg.name='mergeReady'; cell.cont.addChild(mg);
     }
   }
 
   if(cell===selectedCell && cell.state==='revealed'){
-    const sel=new PIXI.Graphics(); sel.lineStyle(3,0xffd24a); sel.drawPolygon(hexCorners(s+2)); cell.cont.addChild(sel);
+    const sel=new PIXI.Graphics(); sel.lineStyle(3,0x8b6200); sel.drawPolygon(hexCorners(s+2)); cell.cont.addChild(sel);
   }
 }
 
@@ -986,7 +1000,7 @@ function startMerge(cell){
   for(const c of hexCells){
     if(c===cell) continue;
     if(c.state==='revealed' && c.lvl===cell.lvl && c.lvl<TUNE.maxLvl && c.building===cell.building){
-      const hl=new PIXI.Graphics(); hl.lineStyle(2.5,0xffd24a,0.9); hl.drawPolygon(hexCorners(HEX_SIZE-1));
+      const hl=new PIXI.Graphics(); hl.lineStyle(2.5,0x8b6200,0.9); hl.drawPolygon(hexCorners(HEX_SIZE-1));
       hl.name='mergeHL'; c.cont.addChild(hl);
     } else if(c.state==='revealed' || c.state==='flippable' || c.state==='empty'){
       const dim=new PIXI.Graphics(); dim.beginFill(0x000000,0.45); dim.drawPolygon(hexCorners(HEX_SIZE));
@@ -1028,8 +1042,8 @@ function doMerge(source, target){
     shake=14;
     for(let i=0;i<4;i++) setTimeout(()=>burstSound(4), i*110);
     if(gen){
-      spawnFloat(target.px, target.py-52, gen.name + ' 降临！', 0xffd24a);
-      spawnFloat(target.px, target.py-28, gen.desc, bt ? bt.hex : 0xffd24a);
+      spawnFloat(target.px, target.py-52, gen.name + ' 降临！', 0x8b6200);
+      spawnFloat(target.px, target.py-28, gen.desc, bt ? bt.hex : 0x8b6200);
       // Lv4爆点：500ms 降临动画后触发专属强化选择
       playMaxGenAnim(gen.name, () => showGeneralUpgradePick(gen));
     }
@@ -1060,7 +1074,7 @@ function showGeneralPick(cell, bt){
     : GENERALS[bt.key][Math.floor(Math.random()*GENERALS[bt.key].length)];
   cell.general = gen;
   drawCell(cell);
-  spawnFloat(cell.px, cell.py-52, gen.name + ' 降临！', 0xffd24a);
+  spawnFloat(cell.px, cell.py-52, gen.name + ' 降临！', 0x8b6200);
   spawnFloat(cell.px, cell.py-28, gen.desc, bt.hex);
   burstSound(4);
   updateHUD();
@@ -1147,7 +1161,7 @@ function showBuffPick(){
   rerollRow.innerHTML = `
     <button id="rerollBtn" onclick="rerollBuff()" style="background:#162e1e;color:#6fe89a;border:1px solid #2e6640;border-radius:6px;padding:6px 14px;font-size:12px;${rerollStyle}">📺 看广告刷新 (${remaining}/1)</button>
     <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
-      <button onclick="pickAllBuffs()" style="background:#2a3a10;color:#ffd24a;border:2px solid #8a9a22;border-radius:8px;padding:9px 22px;font-size:15px;font-weight:700;${takeAllStyle}">✨ 我全都要${takeAllUsed?' (已使用)':''}</button>
+      <button onclick="pickAllBuffs()" style="background:#e8d8b8;color:#7a1a08;border:1px solid #8b6200;border-radius:2px;padding:9px 22px;font-size:15px;font-weight:700;${takeAllStyle}">✨ 我全都要${takeAllUsed?' (已使用)':''}</button>
       <div style="font-size:10px;color:#5a8a9a;">💎 购买终身卡，每局1次</div>
     </div>`;
   optDiv.appendChild(rerollRow);
@@ -1246,7 +1260,7 @@ function checkLevelUp(){
   baseLvl++;
   const _bc=hexCells.find(c=>c.state==='base'); if(_bc) drawCell(_bc);
   unlockRing();
-  spawnFloat(cx, cy-55, '基地 Lv'+baseLvl+'!', 0xffd24a);
+  spawnFloat(cx, cy-55, '基地 Lv'+baseLvl+'!', 0x8b6200);
   burstSound(3); shake=5;
   updateHUD();
   playBaseLevelUpAnim(baseLvl, showBuffPick);
@@ -1289,7 +1303,7 @@ function spawnWave(){
   if(waveCount > 15){
     waveCount = 16;     // 投封上限，防止失败路径计数器失控（如不投封会跑到第N波）
     // 所有波次已发完，等场上清空再胜利
-    spawnFloat(cx, cy-80, '最终波已结束！清空残敌！', 0xffd24a);
+    spawnFloat(cx, cy-80, '最终波已结束！清空残敌！', 0x8b6200);
     return;
   }
 
@@ -1389,7 +1403,7 @@ function spawnBoss(){
   cont.addChild(body);
   const statusRing=new PIXI.Graphics(); cont.addChild(statusRing); e.statusRing=statusRing;
   const crown=new PIXI.Text('♛',{fontSize:18,fill:'#fff0c0',fontWeight:'800'}); crown.anchor.set(0.5); crown.y=-1; cont.addChild(crown);
-  const nameT=new PIXI.Text('魏王·曹操',{fontSize:12,fill:'#ffd24a',fontWeight:'800',stroke:'#000',strokeThickness:3}); nameT.anchor.set(0.5); nameT.y=-size-13; cont.addChild(nameT);
+  const nameT=new PIXI.Text('魏王·曹操',{fontSize:12,fill:'#8b6200',fontWeight:'800',stroke:'#000',strokeThickness:3}); nameT.anchor.set(0.5); nameT.y=-size-13; cont.addChild(nameT);
   const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-24,-size-7,48,4); hpBg.endFill(); cont.addChild(hpBg);
   const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
   e.hpFill=hpFill; e.cont=cont;
@@ -1414,7 +1428,7 @@ function onBossDeath(e){
   burstSound(5);
   for(let i=0;i<16;i++){
     const ang=(Math.PI*2/16)*i;
-    spawnFloat(e.x+Math.cos(ang)*34, e.y+Math.sin(ang)*34, '✦', 0xffd24a);
+    spawnFloat(e.x+Math.cos(ang)*34, e.y+Math.sin(ang)*34, '✦', 0x8b6200);
   }
   // 掉落强化宝箱：点击开出三选一（不再立即弹）
   spawnBossChest(e.x, Math.min(e.y, cy - HEX_SIZE*3));
@@ -1428,25 +1442,25 @@ function spawnBossChest(x, y){
   cont.hitArea = new PIXI.Circle(0,0,36);
   // 光柱
   const beam = new PIXI.Graphics();
-  beam.beginFill(0xffd24a, 0.18); beam.drawRect(-8, -90, 16, 90); beam.endFill();
-  beam.beginFill(0xffd24a, 0.08); beam.drawRect(-18, -90, 36, 90); beam.endFill();
+  beam.beginFill(0x8b6200, 0.18); beam.drawRect(-8, -90, 16, 90); beam.endFill();
+  beam.beginFill(0x8b6200, 0.08); beam.drawRect(-18, -90, 36, 90); beam.endFill();
   cont.addChild(beam);
   // 脉冲发光圈（动态更新）
   const glow = new PIXI.Graphics(); glow.name='chestGlow'; cont.addChild(glow);
   // 宝箱本体
   const g=new PIXI.Graphics();
-  g.beginFill(0x7a4515); g.lineStyle(3,0xffd24a,1); g.drawRoundedRect(-18,-14,36,28,5); g.endFill();
-  g.lineStyle(2,0xffd24a,0.9); g.moveTo(-18,-2); g.lineTo(18,-2);
-  g.beginFill(0xffd24a); g.drawRect(-5,-8,10,10); g.endFill();
+  g.beginFill(0x7a4515); g.lineStyle(3,0x8b6200,1); g.drawRoundedRect(-18,-14,36,28,5); g.endFill();
+  g.lineStyle(2,0x8b6200,0.9); g.moveTo(-18,-2); g.lineTo(18,-2);
+  g.beginFill(0x8b6200); g.drawRect(-5,-8,10,10); g.endFill();
   g.lineStyle(0); g.beginFill(0xffaa22,0.5); g.drawCircle(0,-2,4); g.endFill();
   cont.addChild(g);
-  const t=new PIXI.Text('点击开启！',{fontSize:12,fill:'#ffd24a',fontWeight:'900',stroke:'#000',strokeThickness:3});
+  const t=new PIXI.Text('点击开启！',{fontSize:12,fill:'#8b6200',fontWeight:'900',stroke:'#000',strokeThickness:3});
   t.anchor.set(0.5); t.y=-32; cont.addChild(t);
   cont.on('pointerdown', ()=>openBossChest());
   floatC.addChild(cont);
   bossChest = { cont, baseX:x, baseY:y, animTimer:0 };
   spawnFloat(x, y-56, '★ 强化宝箱掉落！', 0x4aff8a);
-  spawnFloat(x, y-72, '点击开启', 0xffd24a);
+  spawnFloat(x, y-72, '点击开启', 0x8b6200);
 }
 
 function openBossChest(){
@@ -1473,7 +1487,7 @@ function removeEnemy(idx){
     const drop = Math.round(waveCount * GOLD_PER_KILL[e.waveType] * TUNE.goldMul);
     if(drop > 0){
       gold += drop; goldEarned += drop;
-      if(drop >= 20) spawnFloat(e.x, e.y-14, '+'+drop+'G', 0xffd24a);
+      if(drop >= 20) spawnFloat(e.x, e.y-14, '+'+drop+'G', 0x8b6200);
       updateHUD();
     }
   }
@@ -1504,7 +1518,7 @@ function tick(dt){
     if(glow){
       glow.clear();
       const a1 = 0.35 + Math.abs(Math.sin(at/280))*0.55;
-      glow.lineStyle(4, 0xffd24a, a1); glow.drawCircle(0, 0, 22+Math.sin(at/190)*5);
+      glow.lineStyle(4, 0x8b6200, a1); glow.drawCircle(0, 0, 22+Math.sin(at/190)*5);
       glow.lineStyle(2, 0xffaa22, a1*0.7); glow.drawCircle(0, 0, 32+Math.sin(at/190+1)*5);
     }
   }
@@ -1518,8 +1532,10 @@ function tick(dt){
       if(!cell.cdArc) cell.cdArc=new PIXI.Graphics();
       if(cell.cont.children.indexOf(cell.cdArc)<0) cell.cont.addChild(cell.cdArc);
       cell.cdArc.clear();
-      cell.cdArc.lineStyle(2, 0xff8844, 0.45);
-      cell.cdArc.drawPolygon(hexCorners(HEX_SIZE-3));
+      cell.cdArc.beginFill(0x7a5838, 0.14);
+      cell.cdArc.lineStyle(2, 0x7a5838, 0.65);
+      cell.cdArc.drawPolygon(hexCorners(HEX_SIZE));
+      cell.cdArc.endFill();
     }
   } else {
     for(const cell of hexCells){ if(cell.cdArc) cell.cdArc.clear(); }
@@ -2036,7 +2052,7 @@ function tick(dt){
       const shots = (isGeneral && gen.multishot) ? gen.multishot : 1;
 
         // 防守：站桩即时伤害 + 投射物视觉
-        const projColor = isGeneral ? 0xffd24a : bt.hex;
+        const projColor = isGeneral ? 0x8b6200 : bt.hex;
         const projSize = isGeneral ? gen.projSize : 3;
 
         // 司马懿「狼顾」蓄力：无目标时累积，命中时消费
@@ -2073,7 +2089,7 @@ function tick(dt){
           if(gen && gen.key==='huangzhong' && globalBuffs.critChance_huangzhong){
             if(Math.random() < globalBuffs.critChance_huangzhong){
               finalDmg *= (globalBuffs.critMul_huangzhong || 3);
-              spawnFloat(tgt.x, tgt.y-18, '暴击！', 0xffd24a);
+              spawnFloat(tgt.x, tgt.y-18, '暴击！', 0x8b6200);
             }
           }
 
@@ -2248,7 +2264,7 @@ function tick(dt){
 
           if(tgt.hp<=0){
             const idx=enemies.indexOf(tgt);
-            if(idx>=0){spawnFloat(tgt.x,tgt.y-12,gen?gen.name+'击破':'击破',0xffd24a);removeEnemy(idx);}
+            if(idx>=0){spawnFloat(tgt.x,tgt.y-12,gen?gen.name+'击破':'击破',0x8b6200);removeEnemy(idx);}
           } else { updateEnemyHP(tgt); }
         }
     }
@@ -2271,9 +2287,9 @@ function tick(dt){
           if(hitCount >= shaoNianAtk.targets) break;
           st.hp -= dmg;
           trackDmg('shaonian','少年',dmg);
-          spawnProjectile(baseCell.px, baseCell.py, st.x, st.y, 0xffd24a, 3);
+          spawnProjectile(baseCell.px, baseCell.py, st.x, st.y, 0x8b6200, 3);
           const sei=enemies.indexOf(st);
-          if(st.hp<=0&&sei>=0){spawnFloat(st.x,st.y-14,'少年击破',0xffd24a);removeEnemy(sei);}
+          if(st.hp<=0&&sei>=0){spawnFloat(st.x,st.y-14,'少年击破',0x8b6200);removeEnemy(sei);}
           else if(st.hp>0){updateEnemyHP(st);}
           hitCount++;
         }
@@ -2291,13 +2307,13 @@ function tick(dt){
       // 弧线倒计时显示
       if(!cell.timerArc){
         cell.timerArc=new PIXI.Graphics();
-        cell.timerText=new PIXI.Text('',{fontSize:9,fill:'#ffd24a',fontWeight:'800'});
+        cell.timerText=new PIXI.Text('',{fontSize:9,fill:'#8b6200',fontWeight:'800'});
         cell.timerText.anchor.set(0.5);
         cell.cont.addChild(cell.timerArc); cell.cont.addChild(cell.timerText);
       }
       const pct=cell.generalRespawnTimer/5000;
       cell.timerArc.clear();
-      cell.timerArc.lineStyle(3,0xffd24a,0.75);
+      cell.timerArc.lineStyle(3,0x8b6200,0.75);
       cell.timerArc.arc(0,0,HEX_SIZE-5,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);
       cell.timerText.text=Math.ceil(cell.generalRespawnTimer/1000)+'s';
     } else if(cell.timerArc){
@@ -2439,6 +2455,11 @@ function tick(dt){
         if(dragonLance) spawnFloat(nearest.x, nearest.y-20, '龙胆！', 0x44ddff);
 
         nearest.hp -= troopDmg;
+        // 赵云「铁血」：普攻偷血25%（龙胆大伤=大回血，A+C自然联动）
+        if(t.gen && t.gen.key==='zhaoyun'){
+          const healAmt=Math.round(troopDmg*0.25);
+          if(healAmt>0){ t.hp=Math.min(t.maxHp, t.hp+healAmt); updateTroopHP(t); spawnFloat(nearest.x,nearest.y-14,'+'+healAmt,0x44ff88); }
+        }
         trackDmg(t.srcKey, t.srcName, troopDmg);
         // 近战攻击后吸引仇恨：受击敌人转向该亲兵2.5秒
         nearest.aggroTroop=t; nearest.aggroUntil=tnow+2500;
@@ -2561,7 +2582,7 @@ function tick(dt){
         const nei=enemies.indexOf(nearest);
         if(nearest.hp<=0){
           interceptCount++;
-          if(nei>=0){spawnFloat(nearest.x,nearest.y-12,t.gen?'★'+t.gen.name:'击破',0xffd24a);removeEnemy(nei);}
+          if(nei>=0){spawnFloat(nearest.x,nearest.y-12,t.gen?'★'+t.gen.name:'击破',0x8b6200);removeEnemy(nei);}
           // 甘宁「奇袭」：击杀后对最近另一目标造成50%伤害
           if(globalBuffs.ganningChain && t.gen && t.gen.key==='ganning' && enemies.length>0){
             let chainTgt=null, chainD=Infinity;
@@ -2595,7 +2616,7 @@ function tick(dt){
             if(t.isGeneralTroop){
               t.sourceCell.generalOut=false;
               t.sourceCell.generalRespawnTimer=5000;
-              spawnFloat(t.x,t.y-14,'战死！',0xffd24a);
+              spawnFloat(t.x,t.y-14,'战死！',0x8b6200);
             } else {
               spawnFloat(t.x,t.y-10,'阵亡',0xff5a5a);
             }
@@ -2630,7 +2651,7 @@ function tick(dt){
       if(isPulse){
         if(!c.guidePulse){ c.guidePulse=new PIXI.Graphics(); c.cont.addChild(c.guidePulse); }
         c.guidePulse.clear();
-        c.guidePulse.lineStyle(2.5,guideStep===0?0x4affff:0xffcc00,pa);
+        c.guidePulse.lineStyle(2.5,guideStep===0?0x1133aa:0x8b6200,pa);
         c.guidePulse.drawPolygon(hexCorners(HEX_SIZE+4));
       } else if(c.guidePulse){ c.cont.removeChild(c.guidePulse); c.guidePulse=null; }
     }
@@ -2649,7 +2670,7 @@ function spawnTroop(cell, initialTarget, dmg){
   const spawnX=LANES[laneIdx]+(Math.random()-0.5)*18;
   const spawnY=TROOP_Y_FLOOR - HEX_SIZE*0.5;
   const cont=new PIXI.Container();
-  const body=new PIXI.Graphics(); body.beginFill(isGen?0xffd24a:bt.hex); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  const body=new PIXI.Graphics(); body.beginFill(isGen?0x8b6200:bt.hex); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
   if(cell.general){ const iconGfx=new PIXI.Graphics(); drawWeaponIcon(iconGfx,cell.general.key,size); cont.addChild(iconGfx); }
   const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-size-6,16,3); hpBg.endFill(); cont.addChild(hpBg);
   const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
@@ -2779,7 +2800,7 @@ function spawnGeneralTroop(cell, initialTarget, dmg){
   const spawnX=LANES[laneIdx]+(Math.random()-0.5)*14;
   const spawnY=TROOP_Y_FLOOR - HEX_SIZE*0.5;
   const cont=new PIXI.Container();
-  const body=new PIXI.Graphics(); body.beginFill(0xffd24a); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  const body=new PIXI.Graphics(); body.beginFill(0x8b6200); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
   const ring=new PIXI.Graphics(); ring.lineStyle(2,0xffffff,0.6); ring.drawCircle(0,0,size+2); cont.addChild(ring);
   const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-10,-size-7,20,3); hpBg.endFill(); cont.addChild(hpBg);
   const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
@@ -2787,7 +2808,7 @@ function spawnGeneralTroop(cell, initialTarget, dmg){
   const troop={x:spawnX,y:spawnY,homeX:spawnX,homeY:spawnY,hp,maxHp:hp,dmg,cont,hpFill,size,gen,bt,atkTimer:0,isGeneralTroop:true,sourceCell:cell,srcKey:cell.building,srcName:gen.name,moveSpdMul:gen.spdMul||1,reflect:gen.reflect||0,laneIdx};
   updateTroopHP(troop); troops.push(troop);
   if(troops.length > peakTroopCount) peakTroopCount = troops.length;
-  spawnFloat(spawnX,spawnY-32,gen.name+' 出征！',0xffd24a);
+  spawnFloat(spawnX,spawnY-32,gen.name+' 出征！',0x8b6200);
 }
 
 function spawnRallyTroop(cell, dmg){
@@ -2801,7 +2822,7 @@ function spawnRallyTroop(cell, dmg){
   const size=isMaxLvl?(gen.projSize||6)+2:5;
   const hp=bt.dps*meleeScale(cell.lvl)*(isMaxLvl&&gen?gen.dpsMul:1)*2.5*(isMaxLvl?2:1);
   const cont=new PIXI.Container();
-  const body=new PIXI.Graphics(); body.beginFill(isMaxLvl?0xffd24a:bt.hex,0.65); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  const body=new PIXI.Graphics(); body.beginFill(isMaxLvl?0x8b6200:bt.hex,0.65); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
   const ring=new PIXI.Graphics(); ring.lineStyle(1.5,0x88ddff,0.7); ring.drawCircle(0,0,size+2); cont.addChild(ring);
   if(gen){ const iconGfx=new PIXI.Graphics(); drawWeaponIcon(iconGfx,gen.key,size); cont.addChild(iconGfx); }
   const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-size-6,16,3); hpBg.endFill(); cont.addChild(hpBg);
@@ -2879,33 +2900,33 @@ function buildWarReport(isWin, failedWave){
   const bossKillStr = bossKillTime >= 0 ? bossKillTime + '秒' : (bossArrivalHp >= 0 ? '存活' : '—');
 
   const R = (label, val, color) => `<div style="display:flex;justify-content:space-between;font-size:10.5px;padding:1px 0">
-    <span style="color:#8fa6b2">${label}</span><span style="color:${color||'#d0e8f0'}">${val}</span></div>`;
+    <span style="color:#4a2808">${label}</span><span style="color:${color||'#4a2808'}">${val}</span></div>`;
 
   let dpsRows = '';
   for(const [,st] of sorted){
     const pct = total>0 ? Math.round(st.totalDmg/total*100) : 0;
     const dps2 = Math.round(st.totalDmg/elapsed);
     const flipEff = st.flipCount > 0 ? Math.round(st.totalDmg / st.flipCount) + '伤/翻' : '—';
-    const nameColor = st.name && draftPicks.find(g=>g.name===st.name&&g.category==='advance') ? '#ffb060' : '#4affff';
-    dpsRows += `<div style="font-size:10.5px;color:${nameColor};padding:1px 0">${st.name} ×${st.flipCount||0}翻  ${Math.round(st.totalDmg)}伤 <span style="color:#ffd24a">(${pct}%)</span> · <span style="color:#b0e0ff">${flipEff}</span></div>`;
+    const nameColor = st.name && draftPicks.find(g=>g.name===st.name&&g.category==='advance') ? '#cc3322' : '#1133aa';
+    dpsRows += `<div style="font-size:10.5px;color:${nameColor};padding:1px 0">${st.name} ×${st.flipCount||0}翻  ${Math.round(st.totalDmg)}伤 <span style="color:#8b6200">(${pct}%)</span> · <span style="color:#1133aa">${flipEff}</span></div>`;
   }
 
   return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.8 ──</div>
+    <div style="color:#8b6200;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.5.0 ──</div>
     ${R('阵容', lineup, '#fff')}
-    <div style="font-size:10.5px;padding:1px 0"><span style="color:#8fa6b2">结果</span> ${resultStr} &nbsp;<span style="color:#8fa6b2">时长</span> <span style="color:#4affff">${elapsedStr}</span> &nbsp;<span style="color:#8fa6b2">翻格</span> <span style="color:#ffd24a">${totalFlips}次</span></div>
+    <div style="font-size:10.5px;padding:1px 0"><span style="color:#4a2808">结果</span> ${resultStr} &nbsp;<span style="color:#4a2808">时长</span> <span style="color:#1133aa">${elapsedStr}</span> &nbsp;<span style="color:#4a2808">翻格</span> <span style="color:#8b6200">${totalFlips}次</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
-    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">各将伤害占比</div>
+    <div style="color:#4a2808;font-size:10px;margin-bottom:2px">各将伤害占比</div>
     ${dpsRows}
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
     <div style="color:#ffb060;font-size:10px;margin-bottom:2px">★ 近战专项</div>
-    <div style="font-size:10.5px;color:#d0e8f0">拦截 <span style="color:#ffd24a">${interceptCount}</span>怪 &nbsp;·&nbsp; 护盾承伤 <span style="color:#ffd24a">${wallDmgAbsorbed}</span> (<span style="color:#ffd24a">${shieldPct}%</span>) &nbsp;·&nbsp; 峰值小兵 <span style="color:#ffd24a">${peakTroopCount}</span></div>
-    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
-    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">翻格效率</div>
-    <div style="font-size:10.5px;color:#d0e8f0">全局 <span style="color:#b0e0ff">${totalFlips > 0 ? Math.round(total / totalFlips) : 0}伤/翻</span> &nbsp;·&nbsp; 共翻 <span style="color:#ffd24a">${totalFlips}次</span> &nbsp;·&nbsp; 总伤 <span style="color:#ffd24a">${Math.round(total)}</span></div>
-    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
-    <div style="color:#8fa6b2;font-size:10px;margin-bottom:2px">BOSS</div>
-    <div style="font-size:10.5px;color:#d0e8f0">到达时城墙 <span style="color:#ffd24a">${bossArrPct}</span> &nbsp;·&nbsp; 被杀于 <span style="color:#ffd24a">${bossKillStr}</span></div>
+    <div style="font-size:10.5px;color:#4a2808">拦截 <span style="color:#8b6200">${interceptCount}</span>怪 &nbsp;·&nbsp; 护盾承伤 <span style="color:#8b6200">${wallDmgAbsorbed}</span> (<span style="color:#8b6200">${shieldPct}%</span>) &nbsp;·&nbsp; 峰值小兵 <span style="color:#8b6200">${peakTroopCount}</span></div>
+    <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
+    <div style="color:#4a2808;font-size:10px;margin-bottom:2px">翻格效率</div>
+    <div style="font-size:10.5px;color:#4a2808">全局 <span style="color:#1133aa">${totalFlips > 0 ? Math.round(total / totalFlips) : 0}伤/翻</span> &nbsp;·&nbsp; 共翻 <span style="color:#8b6200">${totalFlips}次</span> &nbsp;·&nbsp; 总伤 <span style="color:#8b6200">${Math.round(total)}</span></div>
+    <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
+    <div style="color:#4a2808;font-size:10px;margin-bottom:2px">BOSS</div>
+    <div style="font-size:10.5px;color:#4a2808">到达时城墙 <span style="color:#8b6200">${bossArrPct}</span> &nbsp;·&nbsp; 被杀于 <span style="color:#8b6200">${bossKillStr}</span></div>
   </div>`;
 }
 
@@ -2915,7 +2936,7 @@ function endGame(){
   const overlay = document.getElementById('gameOverlay');
   overlay.style.display='flex';
   const inner = overlay.querySelector('div');
-  if(inner) inner.innerHTML = `<div class="go-text">基地陷落</div>${reportHtml}<button id="btnRestart2" style="margin-top:10px;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:15px;cursor:pointer;">重开</button>`;
+  if(inner) inner.innerHTML = `<div class="go-text">基地陷落</div>${reportHtml}<button id="btnRestart2" style="margin-top:10px;background:#7a1a08;color:#f5e0c0;border:none;border-radius:2px;padding:9px 22px;font-size:15px;cursor:pointer;">重开</button>`;
   const btn2 = document.getElementById('btnRestart2');
   if(btn2) btn2.onclick=()=>{ readTune(); startGame(); };
 }
@@ -2933,7 +2954,7 @@ function winGame(){
   if(el) el.innerHTML = reportHtml;
   const diffEl=document.getElementById('difficultyEl'); if(diffEl) diffEl.textContent=difficulty;
   document.getElementById('winOverlay').style.display='flex';
-  spawnFloat(cx,cy-60,'胜利！撑过15波！',0xffd24a);
+  spawnFloat(cx,cy-60,'胜利！撑过15波！',0x8b6200);
 }
 
 function showGuideHint(text){ const el=document.getElementById('guideHint'); if(el){el.textContent=text;el.style.display='block';} }
@@ -2978,8 +2999,8 @@ function updateHUD(){
   document.getElementById('lvlBar').style.width = Math.max(0,Math.min(100, progress)) + '%';
   const lvlHintEl=document.getElementById('lvlHintEl');
   if(lvlHintEl){
-    if(upDone>=UPGRADE_FLIPS.length){ lvlHintEl.textContent='已满级'; lvlHintEl.style.color='#ffd24a'; }
-    else{ const rem=UPGRADE_FLIPS[upDone]-totalFlips; lvlHintEl.textContent='还需'+rem+'次升级'; lvlHintEl.style.color=rem<=2?'#ffd24a':'#ffd24a99'; }
+    if(upDone>=UPGRADE_FLIPS.length){ lvlHintEl.textContent='已满级'; lvlHintEl.style.color='#8b6200'; }
+    else{ const rem=UPGRADE_FLIPS[upDone]-totalFlips; lvlHintEl.textContent='还需'+rem+'次升级'; lvlHintEl.style.color=rem<=2?'#8b6200':'#8b620099'; }
   }
   document.getElementById('hpEl').textContent=Math.max(0,baseHP);
   document.getElementById('hpBar').style.width=(baseHP/maxHP*100)+'%';
