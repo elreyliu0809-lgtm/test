@@ -37,9 +37,38 @@ body { display:flex; flex-direction:column; align-items:center; }
 #gameOverlay button { margin-top:16px; background:#1f6feb; color:#fff; border:none; border-radius:8px; padding:10px 24px; font-size:16px; cursor:pointer; }
 
 /* 选择面板 */
-#pickOverlay { position:absolute; inset:0; background:#000a; display:none; justify-content:flex-start; align-items:center; z-index:25; flex-direction:column; padding-top:5%; overflow-y:auto; }
+#pickOverlay { position:absolute; inset:0; background:#000a; display:none; justify-content:flex-end; align-items:center; z-index:25; flex-direction:column; padding-bottom:12%; overflow-y:auto; }
 #pickTitle { color:#ffd24a; font-size:18px; font-weight:800; margin-bottom:10px; text-shadow:0 2px 8px #000; }
-#pickOptions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; padding:0 12px; width:100%; align-items:flex-start; }
+#pickOptions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; padding:0 12px; width:100%; align-items:flex-start;
+  transform:translateY(50px); opacity:0; transition:transform .25s ease-out, opacity .2s; }
+#pickOptions.anim-in { transform:translateY(0); opacity:1; }
+
+/* 基地升级动画层 */
+#baseLevelAnim { position:absolute; inset:0; display:none; justify-content:center; align-items:center;
+  flex-direction:column; z-index:28; pointer-events:none;
+  background:radial-gradient(circle at 50% 65%, #ffd24a18 0%, transparent 65%); }
+.bla-ring { position:absolute; border-radius:50%; border:3px solid #ffd24a; width:40px; height:40px;
+  animation:blaRingExpand .9s ease-out forwards; }
+.bla-ring2 { animation-delay:.15s; border-color:#ffd24a88; }
+.bla-title { font-size:42px; font-weight:900; color:#ffd24a; letter-spacing:2px;
+  text-shadow:0 0 24px #ffd24a99, 0 2px 8px #000;
+  animation:blaTextPop .45s cubic-bezier(.18,1.4,.6,1) forwards; }
+.bla-sub { font-size:16px; color:#ffe899; margin-top:6px; letter-spacing:1px;
+  animation:blaTextPop .45s .1s cubic-bezier(.18,1.4,.6,1) both; }
+@keyframes blaRingExpand { from{width:40px;height:40px;opacity:.9} to{width:240px;height:240px;opacity:0} }
+@keyframes blaTextPop { from{transform:scale(.5);opacity:0} to{transform:scale(1);opacity:1} }
+
+/* 四级武将降临动画层 */
+#maxGenAnim { position:absolute; inset:0; display:none; justify-content:center; align-items:center;
+  flex-direction:column; z-index:28; pointer-events:none; }
+.mga-flash { position:absolute; inset:0; background:#ffd24a; animation:mgaFlash .18s ease-out forwards; }
+.mga-banner { background:linear-gradient(135deg,#1a2a10,#2a4015); border:2px solid #ffd24a;
+  border-radius:14px; padding:10px 28px; text-align:center;
+  animation:mgaBannerPop .35s cubic-bezier(.18,1.4,.6,1) forwards; }
+.mga-name { font-size:28px; font-weight:900; color:#ffd24a; text-shadow:0 0 16px #ffd24a88; }
+.mga-label { font-size:14px; color:#ffe899; margin-top:2px; letter-spacing:2px; }
+@keyframes mgaFlash { from{opacity:.35} to{opacity:0} }
+@keyframes mgaBannerPop { from{transform:scale(.6) translateY(-16px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
 .pick-card { background:#16242c; border:2px solid #2c3f4b; border-radius:10px; padding:8px 10px; flex:1; min-width:88px; max-width:120px;
   cursor:pointer; text-align:center; transition:all .15s; }
 .pick-card:hover { border-color:#ffd24a; transform:scale(1.06); }
@@ -146,6 +175,10 @@ body { display:flex; flex-direction:column; align-items:center; }
   <!-- 强化槽位（右侧纵列，最多5个：4将+少年） -->
   <div id="buffBar"></div>
   <div id="buffDetail"></div>
+  <!-- 基地升级动画层（1s，接后显示 pickOverlay） -->
+  <div id="baseLevelAnim"></div>
+  <!-- 四级武将降临动画层（500ms，接后显示 pickOverlay） -->
+  <div id="maxGenAnim"></div>
 </div>
 
 <div id="hpHud">
@@ -231,8 +264,9 @@ const GENERALS = {
 
 // ===== 通用词条（保底） =====
 const BUFF_POOL_COMMON = [
-  { key:'heal',  name:'城墙修复', desc:'城墙回血30',    icon:'♥', apply: g=>{ baseHP=Math.min(maxHP, baseHP+30); }},
-  { key:'maxHp', name:'坚城厚壁', desc:'HP上限+40',     icon:'🛡', apply: g=>{ maxHP+=40; baseHP+=40; }},
+  { key:'heal',   name:'城墙修复', desc:'城墙回血30',              icon:'♥', apply: g=>{ baseHP=Math.min(maxHP, baseHP+30); }},
+  { key:'maxHp',  name:'坚城厚壁', desc:'HP上限+40',               icon:'🛡', apply: g=>{ maxHP+=40; baseHP+=40; }},
+  { key:'morale', name:'士气高涨', desc:'全将攻击伤害+60%（可叠加）', icon:'⚡', apply: g=>{ g.globalDmg = (g.globalDmg||1) + 0.6; }},
 ];
 
 // ===== 少年（主基地英雄）强化词条 =====
@@ -966,8 +1000,8 @@ function doMerge(source, target){
     if(gen){
       spawnFloat(target.px, target.py-52, gen.name + ' 降临！', 0xffd24a);
       spawnFloat(target.px, target.py-28, gen.desc, bt ? bt.hex : 0xffd24a);
-      // Lv4爆点：触发该武将专属强化选择
-      showGeneralUpgradePick(gen);
+      // Lv4爆点：500ms 降临动画后触发专属强化选择
+      playMaxGenAnim(gen.name, () => showGeneralUpgradePick(gen));
     }
   } else {
     target.cont.scale.set(1.25);
@@ -1002,6 +1036,21 @@ function showGeneralPick(cell, bt){
   updateHUD();
 }
 
+// ===== 升级/降临动画 =====
+function playBaseLevelUpAnim(lvl, cb){
+  const el = document.getElementById('baseLevelAnim');
+  el.innerHTML = `<div class="bla-ring"></div><div class="bla-ring bla-ring2"></div><div class="bla-title">基地 Lv${lvl}</div><div class="bla-sub">解锁新战线</div>`;
+  el.style.display = 'flex';
+  setTimeout(()=>{ el.style.display='none'; el.innerHTML=''; cb(); }, 1000);
+}
+
+function playMaxGenAnim(genName, cb){
+  const el = document.getElementById('maxGenAnim');
+  el.innerHTML = `<div class="mga-flash"></div><div class="mga-banner"><div class="mga-name">${genName}</div><div class="mga-label">降　临</div></div>`;
+  el.style.display = 'flex';
+  setTimeout(()=>{ el.style.display='none'; el.innerHTML=''; cb(); }, 500);
+}
+
 // ===== 武将升满Lv4时的专属强化选择 =====
 function showGeneralUpgradePick(gen){
   const upgrades = GENERAL_UPGRADES[gen.key] || [];
@@ -1023,6 +1072,9 @@ function showGeneralUpgradePick(gen){
     optDiv.appendChild(card);
   });
   overlay.style.display = 'flex';
+  const optDiv2 = document.getElementById('pickOptions');
+  optDiv2.classList.remove('anim-in');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>optDiv2.classList.add('anim-in')));
 }
 
 // ===== 通用词条选择（基地升级时） =====
@@ -1070,6 +1122,8 @@ function showBuffPick(){
     </div>`;
   optDiv.appendChild(rerollRow);
   overlay.style.display = 'flex';
+  optDiv.classList.remove('anim-in');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>optDiv.classList.add('anim-in')));
 }
 
 function rerollBuff(){
@@ -1165,7 +1219,7 @@ function checkLevelUp(){
   spawnFloat(cx, cy-55, '基地 Lv'+baseLvl+'!', 0xffd24a);
   burstSound(3); shake=5;
   updateHUD();
-  showBuffPick();
+  playBaseLevelUpAnim(baseLvl, showBuffPick);
 }
 
 function unlockRing(){
@@ -2347,7 +2401,7 @@ function tick(dt){
         const dragonLance = (t.gen && t.gen.key==='zhaoyun' && globalBuffs.tripleStrike_zhaoyun && t._hitCount%3===0);
         // 关羽「武圣」：8秒内产兵批次×8%全军增伤（最多3层）
         const guanyuBonus = globalBuffs.presenceBuff_guanyu ? 1 + Math.min((globalBuffs._guanyuSpawnTimes||[]).filter(t2=>tnow-t2<8000).length,3)*0.08 : 1;
-        const troopDmg = (dragonLance ? t.dmg*2 : t.dmg) * guanyuBonus;
+        const troopDmg = (dragonLance ? t.dmg*2 : t.dmg) * guanyuBonus * (globalBuffs.globalDmg||1);
         if(dragonLance) spawnFloat(nearest.x, nearest.y-20, '龙胆！', 0x44ddff);
 
         nearest.hp -= troopDmg;
@@ -2803,7 +2857,7 @@ function buildWarReport(isWin, failedWave){
   }
 
   return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.4 ──</div>
+    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.5 ──</div>
     ${R('阵容', lineup, '#fff')}
     <div style="font-size:10.5px;padding:1px 0"><span style="color:#8fa6b2">结果</span> ${resultStr} &nbsp;<span style="color:#8fa6b2">时长</span> <span style="color:#4affff">${elapsedStr}</span> &nbsp;<span style="color:#8fa6b2">翻格</span> <span style="color:#ffd24a">${totalFlips}次</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
