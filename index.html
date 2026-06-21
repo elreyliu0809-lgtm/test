@@ -1528,22 +1528,29 @@ function tick(dt){
     }
   }
 
-  // 金币不足视觉：橙色虚线六边形框
+  // 翻格可负担性视觉：金币足→可翻格金光脉冲(邀请翻格)；金币不足→明显压暗(翻不动)
   const _nextFlipPrice = FLIP_PRICES[Math.min(totalFlips, FLIP_PRICES.length-1)];
   const _canAfford = gold >= _nextFlipPrice;
-  if(!_canAfford){
-    for(const cell of hexCells){
-      if(cell.state!=='flippable' && cell.state!=='empty') continue;
-      if(!cell.cdArc) cell.cdArc=new PIXI.Graphics();
-      if(cell.cont.children.indexOf(cell.cdArc)<0) cell.cont.addChild(cell.cdArc);
-      cell.cdArc.clear();
-      cell.cdArc.beginFill(0x7a5838, 0.14);
-      cell.cdArc.lineStyle(2, 0x7a5838, 0.65);
+  const _flipPulse = 0.5 + Math.abs(Math.sin(performance.now()/350))*0.5;   // 0~1 呼吸脉冲
+  for(const cell of hexCells){
+    const _isFlip = cell.state==='flippable' || cell.state==='empty';
+    if(!_isFlip){ if(cell.cdArc) cell.cdArc.clear(); continue; }
+    if(!cell.cdArc) cell.cdArc=new PIXI.Graphics();
+    if(cell.cont.children.indexOf(cell.cdArc)<0) cell.cont.addChild(cell.cdArc);
+    cell.cdArc.clear();
+    if(_canAfford){
+      // 可翻：金色脉冲高亮，明确"现在能翻"
+      cell.cdArc.beginFill(0xffcc44, 0.10 + _flipPulse*0.12);
+      cell.cdArc.drawPolygon(hexCorners(HEX_SIZE)); cell.cdArc.endFill();
+      cell.cdArc.lineStyle(2.5, 0xffd24a, 0.4 + _flipPulse*0.45);
       cell.cdArc.drawPolygon(hexCorners(HEX_SIZE));
-      cell.cdArc.endFill();
+    } else {
+      // 金币不足：深色压暗，明确"翻不动"
+      cell.cdArc.beginFill(0x140d04, 0.5);
+      cell.cdArc.drawPolygon(hexCorners(HEX_SIZE)); cell.cdArc.endFill();
+      cell.cdArc.lineStyle(1.5, 0x5a4428, 0.5);
+      cell.cdArc.drawPolygon(hexCorners(HEX_SIZE));
     }
-  } else {
-    for(const cell of hexCells){ if(cell.cdArc) cell.cdArc.clear(); }
   }
 
   // 金币仅来源于击杀怪物（涓流已移除）
@@ -2260,9 +2267,9 @@ function tick(dt){
               tgt.zhouyuStacks = 0; tgt.zhouyuBurnUntil = 0;   // 引爆清零，tgt 击杀仍走外层统一路径
               const igniteDmg = igniteAt * finalDmg * 0.6;
               const igniteR = HEX_SIZE * (globalBuffs.igniteRadius_zhouyu ? 3 : 2);
-              const _bg=new PIXI.Graphics(); _bg.lineStyle(5,0xff5500,0.95); _bg.drawCircle(0,0,igniteR);
-              _bg.beginFill(0xff7700,0.28); _bg.drawCircle(0,0,igniteR); _bg.endFill(); _bg.x=tgt.x; _bg.y=tgt.y; projC.addChild(_bg);
-              addFadeAnim(projC, _bg, 360, t=>_bg.scale.set(1+t/110));
+              const _bg=new PIXI.Graphics(); _bg.lineStyle(3,0xff5500,0.9); _bg.drawCircle(0,0,igniteR);
+              _bg.beginFill(0xff7700,0.20); _bg.drawCircle(0,0,igniteR); _bg.endFill(); _bg.x=tgt.x; _bg.y=tgt.y; projC.addChild(_bg);
+              addFadeAnim(projC, _bg, 280, t=>_bg.scale.set(Math.min(1, 0.45+t/140)));   // 弹到实际伤害半径(igniteR)即止，不超范围
               spawnFloat(tgt.x, tgt.y-22, '爆燃!', 0xff5500);
               for(let bi=enemies.length-1;bi>=0;bi--){
                 const be=enemies[bi]; if(be===tgt) continue;
@@ -2927,7 +2934,7 @@ function buildWarReport(isWin, failedWave){
   }
 
   return `<div style="margin-top:8px;width:250px;background:#e8d8b8;border:1.5px solid #7a5838;border-radius:4px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#7a1a08;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.6.0 ──</div>
+    <div style="color:#7a1a08;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.6.1 ──</div>
     ${R('阵容', lineup, '#2a1808')}
     <div style="font-size:10.5px;padding:1px 0"><span style="color:#4a2808">结果</span> ${resultStr} &nbsp;<span style="color:#4a2808">时长</span> <span style="color:#1133aa">${elapsedStr}</span> &nbsp;<span style="color:#4a2808">翻格</span> <span style="color:#8b6200">${totalFlips}次</span></div>
     <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
