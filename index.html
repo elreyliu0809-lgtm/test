@@ -245,22 +245,22 @@ const B_TYPES = [
 // ===== 武将池（进攻：产亲兵出征；防守：站桩远程输出） =====
 const GENERALS = {
   advance: [
-    { key:'guanyu',   name:'关羽',  category:'advance', glyph:'⚔关', desc:'统帅千军',  dpsMul:5.0, rangeMul:1.2, spdMul:1.0, projSize:6 },
-    { key:'zhangfei', name:'张飞',  category:'advance', glyph:'⚔张', desc:'亲兵爆裂',  dpsMul:3.5, rangeMul:0.9, spdMul:0.8, projSize:8, aoe:true },
-    { key:'zhaoyun',  name:'赵云',  category:'advance', glyph:'⚔赵', desc:'龙骑突击',  dpsMul:3.5, rangeMul:1.0, spdMul:2.0, projSize:4 },
-    { key:'ganning',  name:'甘宁',  category:'advance', glyph:'⚔甘', desc:'三路突袭',  dpsMul:2.0, rangeMul:1.3, spdMul:1.0, projSize:3, multishot:3, disabled:true },
-    { key:'caoren',   name:'曹仁',  category:'advance', glyph:'⚔曹', desc:'嘲讽反伤',  dpsMul:1.5, rangeMul:2.0, spdMul:1.0, projSize:4, taunt:true, reflect:0.3 },
-    { key:'dianwei',  name:'典韦',  category:'advance', glyph:'⚔典', desc:'灼烧光环',  dpsMul:3.0, rangeMul:1.0, spdMul:1.2, projSize:5, burnAura:true },
-    { key:'lubu',     name:'吕布',  category:'advance', glyph:'⚔布', desc:'铁骑冲阵',  dpsMul:4.0, rangeMul:1.5, spdMul:2.2, projSize:7, charge:true },
+    { key:'guanyu',   name:'关羽',  category:'advance', glyph:'⚔关', desc:'统帅千军',  dpsMul:5.0, spdMul:1.0, projSize:6 },
+    { key:'zhangfei', name:'张飞',  category:'advance', glyph:'⚔张', desc:'亲兵爆裂',  dpsMul:3.5, spdMul:0.8, projSize:8, aoe:true },
+    { key:'zhaoyun',  name:'赵云',  category:'advance', glyph:'⚔赵', desc:'龙骑突击',  dpsMul:3.5, spdMul:2.0, projSize:4 },
+    { key:'ganning',  name:'甘宁',  category:'advance', glyph:'⚔甘', desc:'三路突袭',  dpsMul:2.0, spdMul:1.0, projSize:3, multishot:3, disabled:true },
+    { key:'caoren',   name:'曹仁',  category:'advance', glyph:'⚔曹', desc:'嘲讽反伤',  dpsMul:1.5, spdMul:1.0, projSize:4, taunt:true, reflect:0.3 },
+    { key:'dianwei',  name:'典韦',  category:'advance', glyph:'⚔典', desc:'灼烧光环',  dpsMul:3.0, spdMul:1.2, projSize:5, burnAura:true },
+    { key:'lubu',     name:'吕布',  category:'advance', glyph:'⚔布', desc:'铁骑冲阵',  dpsMul:4.0, spdMul:2.2, projSize:7, charge:true },
   ],
   defense: [
-    { key:'huangzhong', name:'黄忠',  category:'defense', glyph:'◈黄', desc:'极远狙击',  dpsMul:4.0, rangeMul:2.2, spdMul:0.6, projSize:5 },
-    { key:'zhugeliang', name:'诸葛亮',category:'defense', glyph:'◈诸', desc:'减速中毒',  dpsMul:3.5, rangeMul:1.5, spdMul:1.0, projSize:6, slow:0.5 },
-    { key:'zhouyu',     name:'周瑜',  category:'defense', glyph:'◈周', desc:'连锁火焰',  dpsMul:5.5, rangeMul:1.2, spdMul:0.9, projSize:5, chain:4, chainDecay:0.75 },
-    { key:'simayi',     name:'司马懿',category:'defense', glyph:'◈司', desc:'天命雷暴',  dpsMul:2.5, rangeMul:1.0, spdMul:1.0, projSize:5, storm:true },
-    { key:'taishici',   name:'太史慈',category:'defense', glyph:'◈太', desc:'穿透急射',  dpsMul:3.0, rangeMul:1.5, spdMul:1.8, projSize:4 },
-    { key:'pangtong',   name:'庞统',  category:'defense', glyph:'◈庞', desc:'连环雷击',  dpsMul:2.0, rangeMul:1.0, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
-    { key:'xuchu',      name:'许褚',  category:'defense', glyph:'◈许', desc:'击晕控制',  dpsMul:2.5, rangeMul:1.2, spdMul:0.8, projSize:5, stun:0.3, disabled:true },
+    { key:'huangzhong', name:'黄忠',  category:'defense', glyph:'◈黄', desc:'极远狙击',  dpsMul:4.0, rangeRing:5, spdMul:0.6, projSize:5 },
+    { key:'zhugeliang', name:'诸葛亮',category:'defense', glyph:'◈诸', desc:'减速中毒',  dpsMul:3.5, rangeRing:4, spdMul:1.0, projSize:6, slow:0.5 },
+    { key:'zhouyu',     name:'周瑜',  category:'defense', glyph:'◈周', desc:'灼烧叠层',  dpsMul:5.5, rangeRing:3, spdMul:0.9, projSize:5, burnStack:true, igniteAt:5 },
+    { key:'simayi',     name:'司马懿',category:'defense', glyph:'◈司', desc:'天命雷暴',  dpsMul:2.5, rangeRing:3, spdMul:1.0, projSize:5, storm:true },
+    { key:'taishici',   name:'太史慈',category:'defense', glyph:'◈太', desc:'穿透急射',  dpsMul:3.0, rangeRing:4, spdMul:1.8, projSize:4 },
+    { key:'pangtong',   name:'庞统',  category:'defense', glyph:'◈庞', desc:'连环雷击',  dpsMul:2.0, rangeRing:3, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
+    { key:'xuchu',      name:'许褚',  category:'defense', glyph:'◈许', desc:'击晕控制',  dpsMul:2.5, rangeRing:3, spdMul:0.8, projSize:5, stun:0.3, disabled:true },
   ],
 };
 
@@ -348,10 +348,10 @@ const GENERAL_UPGRADES = {
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhugeliang') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhouyu: [
-    { key:'zhouyu_a', name:'周瑜·连环+1', desc:'连锁次数+1共5次', icon:'🔗',
-      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhouyu') cell.general=Object.assign({},cell.general,{chain:5}); }},
-    { key:'zhouyu_b', name:'周瑜·子弹道', desc:'命中时分裂出2条50%伤害飞弹', icon:'✦',
-      apply: g=>{ g.splitProj_zhouyu=true; }},
+    { key:'zhouyu_a', name:'周瑜·速燃', desc:'灼烧提前1层引爆（5→4层）', icon:'🔥',
+      apply: g=>{ g.igniteFast_zhouyu=true; }},
+    { key:'zhouyu_b', name:'周瑜·爆燃', desc:'满层引爆范围扩大（2→3环）', icon:'✦',
+      apply: g=>{ g.igniteRadius_zhouyu=true; }},
     { key:'zhouyu_morale', name:'周瑜·英姿', desc:'周瑜普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhouyu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
@@ -409,7 +409,9 @@ const GENERAL_UPGRADES = {
 const HEX_SIZE = 32;
 const HEX_COL = 1.5 * HEX_SIZE;          // 平顶：列间距（水平）
 const HEX_ROW = Math.sqrt(3) * HEX_SIZE; // 平顶：行间距（垂直）
-const RANGED_RANGE_CAP = HEX_ROW * 9;    // 远程有效射程上限（Bug-5 fix: 从8扩为9），防一杆覆盖全场（B案，可调）
+const RANGED_BASE_RING = 3;              // 远程防御塔基础射程＝3 环（整数格环，唯一射程单位）
+const RANGED_RING_CAP  = 6;              // 远程射程上限＝6 环，防一杆覆盖全场
+const MELEE_RING       = 1;              // 近战射程恒＝1 环（自身格+相邻6格），不参与近战差异化（六格纪律）
 
 function hexToPixel(q, r, cx, cy) {
   return { x: HEX_COL * q + cx, y: HEX_ROW * (r + q*0.5) + cy };
@@ -837,27 +839,29 @@ function drawLanes(){
 function drawWall(){
   if(!wallGfx) return;
   wallGfx.clear();
-  const outerCells = hexCells.filter(c=>c.state!=='base');
-  if(!outerCells.length) return;
-  let minX=Infinity,maxX=-Infinity,minY=Infinity;
-  for(const c of outerCells){ minX=Math.min(minX,c.px); maxX=Math.max(maxX,c.px); minY=Math.min(minY,c.py); }
   const wallColor = wallFlash > 0 ? 0xcc3322 : 0x7a5838;
-  const wallAlpha = wallFlash > 0 ? 0.8 : 0.5;
-  const pad = HEX_SIZE + 8;
-  const wcx = (minX+maxX)/2, wTop = minY - pad, wBottom = cy + pad/2;
-  const wHalf = (maxX-minX)/2 + pad;
+  const wallAlpha = wallFlash > 0 ? 0.85 : 0.65;
+  // 领地集合：与碰撞判定同步（跳过locked；empty也是领地边界）
+  const terr = new Set();
+  for(const c of hexCells){
+    if(c.state==='locked') continue;
+    terr.add(`${c.q},${c.r}`);
+  }
+  if(!terr.size) return;
+  // 六邻居方向 → 对应共享边索引（边i = 顶点i与顶点(i+1)%6）
+  const NBRS = [[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]];
   wallGfx.lineStyle(3, wallColor, wallAlpha);
-  wallGfx.moveTo(wcx - wHalf, wBottom);
-  wallGfx.bezierCurveTo(wcx - wHalf, wTop - 20, wcx + wHalf, wTop - 20, wcx + wHalf, wBottom);
-  // 底部横杆 + 角楼（明确城垣语义）
-  wallGfx.lineStyle(4, wallColor, wallAlpha * 0.7);
-  wallGfx.moveTo(wcx - wHalf - 5, wBottom + 4);
-  wallGfx.lineTo(wcx + wHalf + 5, wBottom + 4);
-  wallGfx.lineStyle(0);
-  wallGfx.beginFill(wallColor, wallAlpha * 0.75);
-  wallGfx.drawRect(wcx - wHalf - 13, wBottom - 1, 9, 13);
-  wallGfx.drawRect(wcx + wHalf + 5, wBottom - 1, 9, 13);
-  wallGfx.endFill();
+  for(const c of hexCells){
+    if(!terr.has(`${c.q},${c.r}`)) continue;
+    for(let i=0;i<6;i++){
+      const [dq,dr]=NBRS[i];
+      if(!terr.has(`${c.q+dq},${c.r+dr}`)){
+        const a0=Math.PI/3*i, a1=Math.PI/3*((i+1)%6);
+        wallGfx.moveTo(c.px+HEX_SIZE*Math.cos(a0), c.py+HEX_SIZE*Math.sin(a0));
+        wallGfx.lineTo(c.px+HEX_SIZE*Math.cos(a1), c.py+HEX_SIZE*Math.sin(a1));
+      }
+    }
+  }
 }
 
 function drawCell(cell){
@@ -875,16 +879,16 @@ function drawCell(cell){
     const t=new PIXI.Text('少',{fontSize:20,fill:'#8b6200',fontWeight:'900'}); t.anchor.set(0.5); t.y=-5; cell.cont.addChild(t);
     const lvlT=new PIXI.Text('Lv'+baseLvl,{fontSize:9,fill:'#8b6200',fontWeight:'700'}); lvlT.anchor.set(0.5); lvlT.y=11; cell.cont.addChild(lvlT);
   } else if(cell.state==='locked'){
-    g.beginFill(0xb8a880,0.4); g.lineStyle(1,0x9a8868);
+    g.beginFill(0xbcb4a0,0.18); g.lineStyle(0.8,0xa09888,0.3);
     g.drawPolygon(poly); g.endFill();
   } else if(cell.state==='flippable'){
-    g.beginFill(0xd8c8a4); g.lineStyle(1.5,0x7a5838);
+    g.beginFill(0xf5ecd8); g.lineStyle(2,0x8b6200,0.9);
     g.drawPolygon(poly); g.endFill();
-    const t=new PIXI.Text('?',{fontSize:16,fill:'#5a3818',fontWeight:'800'}); t.anchor.set(0.5); cell.cont.addChild(t);
+    const t=new PIXI.Text('？',{fontSize:16,fill:'#7a1a08',fontWeight:'900'}); t.anchor.set(0.5); cell.cont.addChild(t);
   } else if(cell.state==='empty'){
-    g.beginFill(0xd8c8a4,0.5); g.lineStyle(1,0x7a5838,0.4);
+    g.beginFill(0xd0c4a8,0.4); g.lineStyle(0.8,0x9a8868,0.35);
     g.drawPolygon(poly); g.endFill();
-    const t=new PIXI.Text('↺',{fontSize:13,fill:'#5a3818'}); t.anchor.set(0.5); cell.cont.addChild(t);
+    const t=new PIXI.Text('↺',{fontSize:13,fill:'#7a5838'}); t.anchor.set(0.5); cell.cont.addChild(t);
   } else if(cell.state==='revealed'){
     const bt = B_TYPES.find(b=>b.key===cell.category) || B_TYPES[0];
     const gen = cell.general;
@@ -933,12 +937,13 @@ function drawCell(cell){
 
 // ===== 塔射程（格）：判定与显示的唯一来源，保证"画几格=打几格" =====
 function towerRangeHex(cell){
-  const bt=B_TYPES.find(b=>b.key===cell.category); if(!bt) return 1;
+  // 近战：永远 1 环（自身格 + 相邻 6 格）。射程不参与近战差异化（六格纪律）
+  if(cell.category==='advance') return MELEE_RING;
+  // 远程：整数环梯队，基础 3 环，将身 rangeRing 覆写；增程 buff 改为整数 +N 环
   const gen=cell.general, isGen=cell.lvl>=TUNE.maxLvl&&gen;
-  const rangeMul=(isGen?gen.rangeMul:1)*(globalBuffs.globalRange||1);
-  let range=bt.range*HEX_SIZE*2.2*rangeMul;
-  if(cell.category!=='advance') range=Math.min(range,RANGED_RANGE_CAP);
-  return Math.max(1, Math.round(range/HEX_ROW));
+  let ring=(isGen && gen.rangeRing) ? gen.rangeRing : RANGED_BASE_RING;
+  ring += (globalBuffs.globalRange||0);
+  return Math.max(2, Math.min(ring, RANGED_RING_CAP));
 }
 // 选中塔时把可攻击的六边形格高亮出来（显性传达射程＝N 格）
 function drawTowerRange(cell){
@@ -1581,6 +1586,17 @@ function tick(dt){
         updateEnemyHP(e); }
     }
 
+    // 周瑜「灼烧叠层」：每层每 0.5s 持续伤害（stun不打断），层数越高烧得越快
+    if(e.zhouyuBurnUntil && now < e.zhouyuBurnUntil && (e.zhouyuStacks||0)>0){
+      e._zhouyuBurnTimer=(e._zhouyuBurnTimer||0)+app.ticker.deltaMS;
+      if(e._zhouyuBurnTimer>=500){ e._zhouyuBurnTimer=0;
+        const zdmg=(e.zhouyuBurnDmg||0)*e.zhouyuStacks;
+        e.hp-=zdmg; trackDmg('zhouyu','周瑜',zdmg);
+        spawnFloat(e.x,e.y-10,Math.round(zdmg)+'🔥',0xff7722);
+        if(e.hp<=0){spawnFloat(e.x,e.y-12,'灼杀',0xff7722);removeEnemy(i);continue;}
+        updateEnemyHP(e); }
+    }
+
     // 诸葛亮中毒：持续伤害（stun不打断）
     if(e.poisonUntil && now < e.poisonUntil){
       e._poisonTimer=(e._poisonTimer||0)+app.ticker.deltaMS;
@@ -1701,7 +1717,7 @@ function tick(dt){
     // 检查是否到达城墙边沿——找最近有效建筑格再推回边沿，跳过merged空格
     let nearCell=null, nearCD=Infinity;
     for(const c of hexCells){
-      if(c.state==='locked' || c.state==='empty') continue;
+      if(c.state==='locked') continue;
       const cd = Math.sqrt((e.x-c.px)**2+(e.y-c.py)**2);
       if(cd < HEX_SIZE + (e.size||8) + 4 && cd < nearCD){ nearCD=cd; nearCell=c; }
     }
@@ -2005,8 +2021,8 @@ function tick(dt){
     if(now-cd < atkInterval) continue;
 
     const rangeHex = towerRangeHex(cell);   // 射程＝整数格，与选中时显示的射程格完全一致
-    // A案角色分工：远程单体将打最远(后排狙击)，近战/连锁将(庞统周瑜)保持最近(护前线/不破坏连锁)
-    const wantFar = (cell.category!=='advance') && !(isGeneral && gen.chain);
+    // A案角色分工：远程单体将打最远(后排狙击)，近战/连锁将(庞统)/叠层将(周瑜)保持最近(护前线/不破坏连锁/聚焦叠层)
+    const wantFar = (cell.category!=='advance') && !(isGeneral && (gen.chain || gen.burnStack));
     let target=null, pickD=wantFar?-Infinity:Infinity, bossT=null, bossD=Infinity;
     for(const e of enemies){
       const d=hexDistance(cell.px,cell.py,e.x,e.y);   // 六边形格距离
@@ -2233,31 +2249,30 @@ function tick(dt){
             addFadeAnim(projC, [cgfx, ...flashes], 300);
           }
 
-          // 连锁攻击（周瑜，排除庞统）
-          if(gen && gen.chain && gen.key!=='pangtong'){
-            let cSrc=tgt, cDmg=finalDmg*(gen.chainDecay||0.6); const hit=new Set([tgt]);
-            for(let c=0;c<gen.chain;c++){
-              let cn=null, cnd=Infinity;
-              for(const ce of enemies){if(hit.has(ce))continue;const cd=Math.sqrt((ce.x-cSrc.x)**2+(ce.y-cSrc.y)**2);if(cd<cnd){cnd=cd;cn=ce;}}
-              if(!cn) break; hit.add(cn); cn.hp-=cDmg;
-              trackDmg(cell.building, gen&&gen.name, cDmg);
-              const chainClr=gen.chainColor||0xff6a00;
-              spawnProjectile(cSrc.x,cSrc.y,cn.x,cn.y,chainClr,4);
-              spawnFloat(cn.x,cn.y-10,Math.round(cDmg)+'',chainClr);
-              const ni=enemies.indexOf(cn);
-              if(cn.hp<=0&&ni>=0){spawnFloat(cn.x,cn.y-12,'连锁',chainClr);removeEnemy(ni);}else if(cn.hp>0){updateEnemyHP(cn);}
-              cSrc=cn; cDmg*=(gen.chainDecay||0.6);
-            }
-            // 周瑜「子弹道」：命中主目标后分裂2条
-            if(globalBuffs.splitProj_zhouyu && gen.key==='zhouyu'){
-              const splitTargets = enemies.filter(e=>e!==tgt).sort(()=>Math.random()-0.5).slice(0,2);
-              for(const st of splitTargets){
-                st.hp -= finalDmg*0.5;
-                trackDmg(cell.building, gen&&gen.name, finalDmg*0.5);
-                spawnProjectile(tgt.x, tgt.y, st.x, st.y, 0xff9900, 3);
-                spawnFloat(st.x, st.y-8, Math.round(finalDmg*0.5)+'', 0xff9900);
-                const si=enemies.indexOf(st);
-                if(st.hp<=0&&si>=0){spawnFloat(st.x,st.y-12,'分裂杀',0xff9900);removeEnemy(si);}else if(st.hp>0){updateEnemyHP(st);}
+          // 周瑜·灼烧叠层：普攻命中叠 1 层灼烧（持续DOT），满 igniteAt 层引爆范围真伤
+          if(gen && gen.burnStack){
+            const igniteAt = (globalBuffs.igniteFast_zhouyu ? (gen.igniteAt||5)-1 : (gen.igniteAt||5));
+            tgt.zhouyuStacks = (tgt.zhouyuStacks||0) + 1;
+            tgt.zhouyuBurnUntil = now + 3000;
+            tgt.zhouyuBurnDmg = finalDmg * 0.18;   // 每层每 0.5s 的灼烧基数
+            spawnFloat(tgt.x, tgt.y-16, '🔥×'+tgt.zhouyuStacks, 0xff7722);
+            if(tgt.zhouyuStacks >= igniteAt){
+              tgt.zhouyuStacks = 0; tgt.zhouyuBurnUntil = 0;   // 引爆清零，tgt 击杀仍走外层统一路径
+              const igniteDmg = igniteAt * finalDmg * 0.6;
+              const igniteR = HEX_SIZE * (globalBuffs.igniteRadius_zhouyu ? 3 : 2);
+              const _bg=new PIXI.Graphics(); _bg.lineStyle(5,0xff5500,0.95); _bg.drawCircle(0,0,igniteR);
+              _bg.beginFill(0xff7700,0.28); _bg.drawCircle(0,0,igniteR); _bg.endFill(); _bg.x=tgt.x; _bg.y=tgt.y; projC.addChild(_bg);
+              addFadeAnim(projC, _bg, 360, t=>_bg.scale.set(1+t/110));
+              spawnFloat(tgt.x, tgt.y-22, '爆燃!', 0xff5500);
+              for(let bi=enemies.length-1;bi>=0;bi--){
+                const be=enemies[bi]; if(be===tgt) continue;
+                const bd=Math.sqrt((be.x-tgt.x)**2+(be.y-tgt.y)**2);
+                if(bd<=igniteR){
+                  be.hp-=igniteDmg; trackDmg(cell.building, gen.name, igniteDmg);
+                  be.zhouyuStacks=0; be.zhouyuBurnUntil=0;
+                  spawnFloat(be.x,be.y-12,Math.round(igniteDmg)+'💥',0xff5500);
+                  if(be.hp<=0){const bei=enemies.indexOf(be);if(bei>=0){spawnFloat(be.x,be.y-14,'灼爆',0xff5500);removeEnemy(bei);}}else{updateEnemyHP(be);}
+                }
               }
             }
           }
@@ -2911,15 +2926,15 @@ function buildWarReport(isWin, failedWave){
     dpsRows += `<div style="font-size:10.5px;color:${nameColor};padding:1px 0">${st.name} ×${st.flipCount||0}翻  ${Math.round(st.totalDmg)}伤 <span style="color:#8b6200">(${pct}%)</span> · <span style="color:#1133aa">${flipEff}</span></div>`;
   }
 
-  return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#8b6200;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.5.0 ──</div>
-    ${R('阵容', lineup, '#fff')}
+  return `<div style="margin-top:8px;width:250px;background:#e8d8b8;border:1.5px solid #7a5838;border-radius:4px;padding:9px 12px;text-align:left;font-size:10.5px">
+    <div style="color:#7a1a08;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.6.0 ──</div>
+    ${R('阵容', lineup, '#2a1808')}
     <div style="font-size:10.5px;padding:1px 0"><span style="color:#4a2808">结果</span> ${resultStr} &nbsp;<span style="color:#4a2808">时长</span> <span style="color:#1133aa">${elapsedStr}</span> &nbsp;<span style="color:#4a2808">翻格</span> <span style="color:#8b6200">${totalFlips}次</span></div>
-    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
+    <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
     <div style="color:#4a2808;font-size:10px;margin-bottom:2px">各将伤害占比</div>
     ${dpsRows}
-    <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
-    <div style="color:#ffb060;font-size:10px;margin-bottom:2px">★ 近战专项</div>
+    <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
+    <div style="color:#7a1a08;font-size:10px;margin-bottom:2px">★ 近战专项</div>
     <div style="font-size:10.5px;color:#4a2808">拦截 <span style="color:#8b6200">${interceptCount}</span>怪 &nbsp;·&nbsp; 护盾承伤 <span style="color:#8b6200">${wallDmgAbsorbed}</span> (<span style="color:#8b6200">${shieldPct}%</span>) &nbsp;·&nbsp; 峰值小兵 <span style="color:#8b6200">${peakTroopCount}</span></div>
     <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
     <div style="color:#4a2808;font-size:10px;margin-bottom:2px">翻格效率</div>
