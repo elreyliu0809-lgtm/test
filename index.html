@@ -268,7 +268,6 @@ const GENERALS = {
 const BUFF_POOL_COMMON = [
   { key:'heal',   name:'城墙修复', desc:'城墙回血30',              icon:'♥', apply: g=>{ baseHP=Math.min(maxHP, baseHP+30); }},
   { key:'maxHp',  name:'坚城厚壁', desc:'HP上限+40',               icon:'🛡', apply: g=>{ maxHP+=40; baseHP+=40; }},
-  { key:'morale', name:'士气高涨', desc:'全将攻击伤害+60%（可叠加）', icon:'⚡', apply: g=>{ g.globalDmg = (g.globalDmg||1) + 0.6; }},
 ];
 
 // ===== 少年（主基地英雄）强化词条 =====
@@ -288,6 +287,7 @@ const SHAONIAN_UPGRADES = [
 
 // ===== 武将专属词条 =====
 // apply(g) 写全局buff；applyCell(cell,g) 写格子级属性（升级时遍历所有同将格）
+// stackable:true 跳过已选过滤，允许多次叠加
 const GENERAL_UPGRADES = {
   // ── 进攻将 ──
   guanyu: [
@@ -295,30 +295,40 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.troopSplash_guanyu=true; }},
     { key:'guanyu_b', name:'关羽·武圣', desc:'每次产兵时激励全军，8秒内每批次产兵全体亲兵伤害+8%（最多3层+24%）', icon:'👑',
       apply: g=>{ g.presenceBuff_guanyu=true; }},
+    { key:'guanyu_morale', name:'士气高涨', desc:'关羽攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='guanyu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhangfei: [
     { key:'zhangfei_a', name:'张飞·霸王怒', desc:'AOE扩展为两圈范围', icon:'💢',
       apply: g=>{ g.aoeRadiusMul_zhangfei=2; }},
     { key:'zhangfei_b', name:'张飞·火爆', desc:'AOE命中的敌人获得灼烧标记，2秒内每0.5秒受AOE伤害30%的持续伤害', icon:'🔥',
       apply: g=>{ g.aoeBurn_zhangfei=true; }},
+    { key:'zhangfei_morale', name:'士气高涨', desc:'张飞攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhangfei') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhaoyun: [
     { key:'zhaoyun_a', name:'赵云·龙胆', desc:'每3击附加×2伤害', icon:'🌀',
       apply: g=>{ g.tripleStrike_zhaoyun=true; }},
     { key:'zhaoyun_b', name:'赵云·七进七出', desc:'亲兵攻速×1.5', icon:'⚡',
       apply: g=>{ g.troopAtkSpd_zhaoyun=1.5; }},
+    { key:'zhaoyun_morale', name:'士气高涨', desc:'赵云攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhaoyun') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   ganning: [
     { key:'ganning_a', name:'甘宁·百船', desc:'多射+1路共4路', icon:'🏹',
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='ganning') cell.general=Object.assign({},cell.general,{multishot:4}); }},
     { key:'ganning_b', name:'甘宁·奇袭', desc:'甘宁亲兵击杀时，对最近另一敌人造成50%伤害', icon:'🎯',
       apply: g=>{ g.ganningChain=true; }},
+    { key:'ganning_morale', name:'士气高涨', desc:'甘宁攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='ganning') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   taishici: [
     { key:'taishici_a', name:'太史慈·穿云贯日', desc:'弹道穿透3次，每次×0.75递减伤害', icon:'➶',
       apply: g=>{ g.pierce_taishici=3; }},
     { key:'taishici_b', name:'太史慈·鸣镝', desc:'每4发蓄力，第5发伤害×2弹速×3', icon:'🎯',
       apply: g=>{ g.mingdi_taishici=true; }},
+    { key:'taishici_morale', name:'士气高涨', desc:'太史慈攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='taishici') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   // ── 防守将 ──
   huangzhong: [
@@ -326,54 +336,72 @@ const GENERAL_UPGRADES = {
       apply: g=>{ g.scatter_huangzhong=3; }},
     { key:'huangzhong_b', name:'黄忠·百步穿心', desc:'暴击率+25%，暴击×5', icon:'💥',
       apply: g=>{ g.critChance_huangzhong=(g.critChance_huangzhong||0)+0.25; g.critMul_huangzhong=5; }},
+    { key:'huangzhong_morale', name:'士气高涨', desc:'黄忠攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='huangzhong') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhugeliang: [
     { key:'zhugeliang_a', name:'诸葛亮·八阵延伸', desc:'减速变AOE，范围内全体慢', icon:'❄',
       apply: g=>{ g.slowAoe_zhugeliang=true; }},
     { key:'zhugeliang_b', name:'诸葛亮·木牛', desc:'减速效果提升到80%', icon:'🐂',
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhugeliang') cell.general=Object.assign({},cell.general,{slow:0.2}); }},
+    { key:'zhugeliang_morale', name:'士气高涨', desc:'诸葛亮攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhugeliang') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhouyu: [
     { key:'zhouyu_a', name:'周瑜·连环+1', desc:'连锁次数+1共5次', icon:'🔗',
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhouyu') cell.general=Object.assign({},cell.general,{chain:5}); }},
     { key:'zhouyu_b', name:'周瑜·子弹道', desc:'命中时分裂出2条50%伤害飞弹', icon:'✦',
       apply: g=>{ g.splitProj_zhouyu=true; }},
+    { key:'zhouyu_morale', name:'士气高涨', desc:'周瑜攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='zhouyu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   simayi: [
     { key:'simayi_a', name:'司马懿·天命扩域', desc:'雷暴从一格扩展为目标周围七格AOE', icon:'⚡',
       apply: g=>{ g.stormExpand_simayi=true; }},
     { key:'simayi_b', name:'司马懿·落雷', desc:'每次雷暴有15%概率触发落雷，对单体造成×5伤害', icon:'⚡',
       apply: g=>{ g.stormBolt_simayi=true; }},
+    { key:'simayi_morale', name:'士气高涨', desc:'司马懿攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='simayi') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   caoren: [
     { key:'caoren_a', name:'曹仁·铁壁', desc:'嘲讽光环扩展为2圈范围', icon:'🛡',
       apply: g=>{ g.tauntRangeMul_caoren=2; }},
     { key:'caoren_b', name:'曹仁·镇慑', desc:'被嘲讽敌人攻速-40%（攻击间隔×1.67）', icon:'🛡',
       apply: g=>{ g.tauntAtkSlow_caoren=true; }},
+    { key:'caoren_morale', name:'士气高涨', desc:'曹仁攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='caoren') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   xuchu: [
     { key:'xuchu_a', name:'许褚·虎痴', desc:'击晕概率×2共60%', icon:'😵',
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='xuchu') cell.general=Object.assign({},cell.general,{stun:0.6}); }},
     { key:'xuchu_b', name:'许褚·军法', desc:'击晕时扩散：周围敌人30%概率连带被晕1秒', icon:'⛓',
       apply: g=>{ g.stunSpread_xuchu=true; }},
+    { key:'xuchu_morale', name:'士气高涨', desc:'许褚攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='xuchu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   dianwei: [
     { key:'dianwei_a', name:'典韦·烈焰', desc:'灼烧半径+60%，DPS×1.5，灼杀也落地火区', icon:'🔥',
       apply: g=>{ g.burnRadiusMul_dianwei=1.6; g.burnDpsMul_dianwei=1.5; g.fireZone_dianwei=true; }},
     { key:'dianwei_b', name:'典韦·殉燃', desc:'亲兵阵亡时火海持续时间+5秒，并减慢范围内敌人移速60%', icon:'🌋',
       apply: g=>{ g.deathFireBoost_dianwei=true; }},
+    { key:'dianwei_morale', name:'士气高涨', desc:'典韦攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='dianwei') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   lubu: [
     { key:'lubu_a', name:'吕布·赤兔', desc:'冲阵穿透宽度×1.5，穿透伤害×1.5', icon:'🐴',
       apply: g=>{ g.chargeWidthMul_lubu=1.5; g.chargeDmgMul_lubu=1.5; }},
     { key:'lubu_b', name:'吕布·方天画戟', desc:'主目标伤害×1.5，冲阵穿透敌人被击退1格', icon:'⚔',
       apply: g=>{ g.chargeKnockback_lubu=true; }},
+    { key:'lubu_morale', name:'士气高涨', desc:'吕布攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='lubu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   pangtong: [
     { key:'pangtong_a', name:'庞统·落凤', desc:'连锁命中处触发1格范围爆炸，爆炸造成50%伤害', icon:'💥',
       apply: g=>{ g.boltExplode_pangtong=true; }},
     { key:'pangtong_b', name:'庞统·连璧', desc:'连锁次数+4（共8次弹射）', icon:'⚡',
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='pangtong') cell.general=Object.assign({},cell.general,{chain:8}); }},
+    { key:'pangtong_morale', name:'士气高涨', desc:'庞统攻击伤害+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='pangtong') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
 };
 
@@ -1057,7 +1085,7 @@ function playMaxGenAnim(genName, cb){
 function showGeneralUpgradePick(gen){
   const upgrades = GENERAL_UPGRADES[gen.key] || [];
   // 过滤已选中的词条
-  const available = upgrades.filter(u => !globalBuffs[u.key]);
+  const available = upgrades.filter(u => u.stackable || !globalBuffs[u.key]);
   if(available.length === 0) return; // 两条都选过了，跳过
 
   pendingPick = { type:'generalUpgrade', options: available };
@@ -1088,7 +1116,7 @@ function buildBuffPool(){
   for(const gen of draftPicks){
     const upgrades = GENERAL_UPGRADES[gen.key] || [];
     for(const u of upgrades){
-      if(!usedKeys.has(u.key)) pool.push(u);
+      if(u.stackable || !usedKeys.has(u.key)) pool.push(u);
     }
   }
   return pool;
@@ -2088,7 +2116,8 @@ function tick(dt){
             if(globalBuffs.slowAoe_zhugeliang && isZhuge){
               const slowRHex = 1;   // 减速AOE：以目标格为中心 1 圈
               // 显性范围视觉：高亮波及的六边形格（与判定范围一致）
-              const _sg=new PIXI.Graphics(); _sg.x=tgt.x; _sg.y=tgt.y; projC.addChild(_sg);
+              const _sgC=pixelToHexCenter(tgt.x,tgt.y);
+              const _sg=new PIXI.Graphics(); _sg.x=_sgC.x; _sg.y=_sgC.y; projC.addChild(_sg);
               for(const o of hexDiskOffsets(slowRHex)){
                 _sg.beginFill(0x66ccff,0.14); _sg.drawPolygon(hexPoly(o.dx,o.dy,HEX_SIZE-2)); _sg.endFill();
                 _sg.lineStyle(1.5,0xaaeeff,0.6); _sg.drawPolygon(hexPoly(o.dx,o.dy,HEX_SIZE-2)); _sg.lineStyle(0);
@@ -2862,7 +2891,7 @@ function buildWarReport(isWin, failedWave){
   }
 
   return `<div style="margin-top:8px;width:250px;background:#060d14;border:1px solid #2a4a6a;border-radius:8px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.5 ──</div>
+    <div style="color:#ffd24a;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.4.8 ──</div>
     ${R('阵容', lineup, '#fff')}
     <div style="font-size:10.5px;padding:1px 0"><span style="color:#8fa6b2">结果</span> ${resultStr} &nbsp;<span style="color:#8fa6b2">时长</span> <span style="color:#4affff">${elapsedStr}</span> &nbsp;<span style="color:#8fa6b2">翻格</span> <span style="color:#ffd24a">${totalFlips}次</span></div>
     <div style="border-top:1px solid #1a2830;margin:5px 0 3px"></div>
