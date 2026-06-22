@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>灰盒 v1.2 · 六边形翻地·自由合成·扇形塔防</title>
+<title>灰盒 v1.7.2 · 六边形翻地·自由合成·扇形塔防</title>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js-legacy@7.3.2/dist/pixi-legacy.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-html,body { background:#ede0c4; color:#2a1808; font-family:"PingFang SC","STKaiti","KaiTi","HiraMinProN-W3","Microsoft YaHei",system-ui,sans-serif;
+html,body { background:#ede0c4; color:#2a1808; font-family:"PingFang SC","Microsoft YaHei","HarmonyOS Sans SC","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif; font-weight:500;
   overflow:hidden; height:100%; }
 body { display:flex; flex-direction:column; align-items:center; }
 
@@ -94,7 +94,7 @@ body { display:flex; flex-direction:column; align-items:center; }
 .draft-card .pick-icon { font-size:18px; }
 .draft-card .pick-name { font-size:13px; }
 .draft-card .pick-desc { font-size:10px; }
-.recommend-badge { position:absolute; top:-1px; right:-1px; background:#8b6200; color:#f5e0c0; font-size:7px; font-weight:800; padding:1px 4px; border-radius:0 2px 0 2px; line-height:1.8; pointer-events:none; }
+.pick-role { display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:1px; margin:2px 0; letter-spacing:0.5px; }
 #draftStart { margin-top:16px; background:#7a1a08; color:#f5e0c0; border:none; border-radius:2px;
   padding:12px 32px; font-size:16px; font-weight:700; cursor:pointer; transition:all .15s; }
 #draftStart:hover { background:#9a2a10; transform:scale(1.05); }
@@ -147,7 +147,7 @@ body { display:flex; flex-direction:column; align-items:center; }
 <body>
 
 <div id="tune">
-  <b>TUNE v1.2</b>
+  <b>TUNE v1.7</b>
   <label>合成阶数<input id="t_maxLvl" type="number" value="4"></label>
   <label>金币倍率<input id="t_goldMul" type="number" value="1.0" style="width:36px"></label>
   <button id="t_apply">重开</button>
@@ -156,6 +156,7 @@ body { display:flex; flex-direction:column; align-items:center; }
 
 <div id="gameArea">
   <canvas id="stage"></canvas>
+  <button id="pauseBtn" onclick="togglePause()" style="position:absolute;top:8px;left:8px;z-index:10;background:#1a4a2ecc;color:#f5e0c0;border:1px solid #4a8a5e;border-radius:4px;padding:4px 10px;font-size:14px;cursor:pointer;backdrop-filter:blur(2px);">⏸</button>
   <div id="hud">
     <div class="hud-card">
       <div class="hud-lbl">波次</div>
@@ -174,6 +175,11 @@ body { display:flex; flex-direction:column; align-items:center; }
   <div id="gameOverlay"><div style="text-align:center"><div class="go-text">基地陷落</div><button id="btnRestart2">重开</button></div></div>
   <div id="winOverlay"><div style="text-align:center"><div class="win-text">🎉 通关！</div><div class="win-sub">撑过 15 波，大获全胜 · 难度 <span id="difficultyEl">1</span></div><div id="winStats" class="win-stats"></div><div style="display:flex;gap:10px;justify-content:center"><button id="btnRestart3" style="background:#7a1a08;color:#f5e0c0;border:none;border-radius:2px;padding:10px 24px;font-size:16px;cursor:pointer;">再战一局</button><button id="btnNextDiff" style="background:#2a5a18;color:#f5e0c0;border:none;border-radius:2px;padding:10px 24px;font-size:16px;cursor:pointer;">下一难度</button></div></div></div>
   <div id="guideHint"></div>
+  <div id="pauseOverlay" onclick="togglePause()" style="display:none;position:fixed;inset:0;z-index:60;background:#1a120899;backdrop-filter:blur(2px);flex-direction:column;justify-content:center;align-items:center;cursor:pointer;user-select:none;">
+    <div style="font-size:54px;line-height:1;">⏸</div>
+    <div style="color:#f5e0c0;font-size:24px;font-weight:800;margin-top:14px;letter-spacing:2px;text-shadow:0 2px 8px #0006;">已暂停</div>
+    <div style="color:#e8d8b8cc;font-size:14px;margin-top:8px;">点击任意处继续</div>
+  </div>
   <!-- 强化槽位（右侧纵列，最多5个：4将+少年） -->
   <div id="buffBar"></div>
   <div id="buffDetail"></div>
@@ -208,7 +214,7 @@ body { display:flex; flex-direction:column; align-items:center; }
 
 <script>
 /* ============================================================
-   灰盒 v1.2 — 基地在底部·只能向上扩·格子耗尽升级·指数数值压力·武将炸裂特效
+   灰盒 v1.7.2 — 基地在底部·只能向上扩·格子耗尽升级·指数数值压力·武将炸裂特效
    ============================================================ */
 
 // ===== TUNE =====
@@ -245,22 +251,22 @@ const B_TYPES = [
 // ===== 武将池（进攻：产亲兵出征；防守：站桩远程输出） =====
 const GENERALS = {
   advance: [
-    { key:'guanyu',   name:'关羽',  category:'advance', glyph:'⚔关', desc:'统帅千军',  dpsMul:5.0, spdMul:1.0, projSize:6 },
-    { key:'zhangfei', name:'张飞',  category:'advance', glyph:'⚔张', desc:'亲兵爆裂',  dpsMul:3.5, spdMul:0.8, projSize:8, aoe:true },
-    { key:'zhaoyun',  name:'赵云',  category:'advance', glyph:'⚔赵', desc:'龙骑突击',  dpsMul:3.5, spdMul:2.0, projSize:4 },
-    { key:'ganning',  name:'甘宁',  category:'advance', glyph:'⚔甘', desc:'三路突袭',  dpsMul:2.0, spdMul:1.0, projSize:3, multishot:3, disabled:true },
-    { key:'caoren',   name:'曹仁',  category:'advance', glyph:'⚔曹', desc:'嘲讽反伤',  dpsMul:1.5, spdMul:1.0, projSize:4, taunt:true, reflect:0.3 },
-    { key:'dianwei',  name:'典韦',  category:'advance', glyph:'⚔典', desc:'灼烧光环',  dpsMul:3.0, spdMul:1.2, projSize:5, burnAura:true },
-    { key:'lubu',     name:'吕布',  category:'advance', glyph:'⚔布', desc:'铁骑冲阵',  dpsMul:4.0, spdMul:2.2, projSize:7, charge:true },
+    { key:'guanyu',   name:'关羽',  category:'advance', glyph:'⚔关', desc:'统帅千军',   role:'主力', roleColor:'#cc3322', dpsMul:5.0, spdMul:1.0, projSize:6 },
+    { key:'zhangfei', name:'张飞',  category:'advance', glyph:'⚔张', desc:'亲兵溅射1圈', role:'AOE',  roleColor:'#cc6622', dpsMul:3.5, spdMul:0.8, projSize:8, aoe:true },
+    { key:'zhaoyun',  name:'赵云',  category:'advance', glyph:'⚔赵', desc:'龙骑突击',   role:'突骑', roleColor:'#22aacc', dpsMul:3.5, spdMul:2.0, projSize:4 },
+    { key:'ganning',  name:'甘宁',  category:'advance', glyph:'⚔甘', desc:'三路突袭',   role:'多射', roleColor:'#33aa66', dpsMul:2.0, spdMul:1.0, projSize:3, multishot:3, disabled:true },
+    { key:'caoren',   name:'曹仁',  category:'advance', glyph:'⚔曹', desc:'嘲讽反伤',   role:'护盾', roleColor:'#1133aa', dpsMul:1.5, spdMul:1.0, projSize:4, taunt:true, reflect:0.3 },
+    { key:'dianwei',  name:'典韦',  category:'advance', glyph:'⚔典', desc:'格位灼烧光环', role:'灼烧', roleColor:'#cc4400', dpsMul:3.0, spdMul:1.2, projSize:5, burnAura:true },
+    { key:'lubu',     name:'吕布',  category:'advance', glyph:'⚔布', desc:'铁骑冲阵',   role:'冲阵', roleColor:'#aa1100', dpsMul:4.0, spdMul:2.2, projSize:7, charge:true },
   ],
   defense: [
-    { key:'huangzhong', name:'黄忠',  category:'defense', glyph:'◈黄', desc:'极远狙击',  dpsMul:4.0, rangeRing:5, spdMul:0.6, projSize:5 },
-    { key:'zhugeliang', name:'诸葛亮',category:'defense', glyph:'◈诸', desc:'减速中毒',  dpsMul:3.5, rangeRing:4, spdMul:1.0, projSize:6, slow:0.5 },
-    { key:'zhouyu',     name:'周瑜',  category:'defense', glyph:'◈周', desc:'灼烧叠层',  dpsMul:5.5, rangeRing:3, spdMul:0.9, projSize:5, burnStack:true, igniteAt:5 },
-    { key:'simayi',     name:'司马懿',category:'defense', glyph:'◈司', desc:'天命雷暴',  dpsMul:2.5, rangeRing:3, spdMul:1.0, projSize:5, storm:true },
-    { key:'taishici',   name:'太史慈',category:'defense', glyph:'◈太', desc:'穿透急射',  dpsMul:3.0, rangeRing:4, spdMul:1.8, projSize:4 },
-    { key:'pangtong',   name:'庞统',  category:'defense', glyph:'◈庞', desc:'连环雷击',  dpsMul:2.0, rangeRing:3, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
-    { key:'xuchu',      name:'许褚',  category:'defense', glyph:'◈许', desc:'击晕控制',  dpsMul:2.5, rangeRing:3, spdMul:0.8, projSize:5, stun:0.3, disabled:true },
+    { key:'huangzhong', name:'黄忠',  category:'defense', glyph:'◈黄', desc:'极远狙击',  role:'狙击', roleColor:'#335599', dpsMul:4.0, rangeRing:5, spdMul:0.6, projSize:5 },
+    { key:'zhugeliang', name:'诸葛亮',category:'defense', glyph:'◈诸', desc:'减速中毒',  role:'减速', roleColor:'#4488cc', dpsMul:3.5, rangeRing:4, spdMul:1.0, projSize:6, slow:0.5 },
+    { key:'zhouyu',     name:'周瑜',  category:'defense', glyph:'◈周', desc:'灼烧叠层',  role:'爆发', roleColor:'#cc6600', dpsMul:5.5, rangeRing:3, spdMul:0.9, projSize:5, burnStack:true, igniteAt:5 },
+    { key:'simayi',     name:'司马懿',category:'defense', glyph:'◈司', desc:'天命雷暴',  role:'雷暴', roleColor:'#7733cc', dpsMul:2.5, rangeRing:3, spdMul:1.0, projSize:5, storm:true },
+    { key:'taishici',   name:'太史慈',category:'defense', glyph:'◈太', desc:'穿透急射',  role:'速射', roleColor:'#228844', dpsMul:3.0, rangeRing:4, spdMul:1.8, projSize:4 },
+    { key:'pangtong',   name:'庞统',  category:'defense', glyph:'◈庞', desc:'连环雷击',  role:'连环', roleColor:'#2288aa', dpsMul:2.0, rangeRing:3, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
+    { key:'xuchu',      name:'许褚',  category:'defense', glyph:'◈许', desc:'击晕控制',  role:'控制', roleColor:'#2244aa', dpsMul:2.5, rangeRing:3, spdMul:0.8, projSize:5, stun:0.3, disabled:true },
   ],
 };
 
@@ -299,7 +305,7 @@ const GENERAL_UPGRADES = {
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='guanyu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   zhangfei: [
-    { key:'zhangfei_a', name:'张飞·霸王怒', desc:'AOE扩展为两圈范围', icon:'💢',
+    { key:'zhangfei_a', name:'张飞·霸王怒', desc:'溅射范围扩大到2圈（19格）', icon:'💢',
       apply: g=>{ g.aoeRadiusMul_zhangfei=2; }},
     { key:'zhangfei_b', name:'张飞·火爆', desc:'AOE命中的敌人获得灼烧标记，2秒内每0.5秒受AOE伤害30%的持续伤害', icon:'🔥',
       apply: g=>{ g.aoeBurn_zhangfei=true; }},
@@ -380,7 +386,7 @@ const GENERAL_UPGRADES = {
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='xuchu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
   dianwei: [
-    { key:'dianwei_a', name:'典韦·烈焰', desc:'灼烧半径+60%，DPS×1.5，灼杀也落地火区', icon:'🔥',
+    { key:'dianwei_a', name:'典韦·烈焰', desc:'格位灼烧扩至1圈（7格），DPS×1.5，灼杀落地火区', icon:'🔥',
       apply: g=>{ g.burnRadiusMul_dianwei=1.6; g.burnDpsMul_dianwei=1.5; g.fireZone_dianwei=true; }},
     { key:'dianwei_b', name:'典韦·殉燃', desc:'亲兵阵亡时火海持续时间+5秒，并减慢范围内敌人移速60%', icon:'🌋',
       apply: g=>{ g.deathFireBoost_dianwei=true; }},
@@ -547,6 +553,7 @@ let waveTimer = 0;
 let waveCount = 0;
 let eliteLaneCycle = 0; // 精英路循环计数器（0=左 1=中 2=右，逐波推进）
 let gameOver = false;
+let gamePaused = false;   // 战斗暂停状态（tick 早退冻结），由 ⏸ 按钮/暂停遮罩切换
 let shake = 0;
 let wallGfx = null; // 城墙图形对象
 // ===== 横向滚动 =====
@@ -665,6 +672,7 @@ function startGame(){
   baseHP=TUNE.baseHP; maxHP=TUNE.baseHP;
   baseLvl=1; totalFlips=0; waveCount=0; eliteLaneCycle=0;
   waveTimer=0; gameOver=false; gameWon=false; shake=0;
+  gamePaused=false; { const _po=document.getElementById('pauseOverlay'); if(_po)_po.style.display='none'; const _pb=document.getElementById('pauseBtn'); if(_pb){_pb.textContent='⏸';_pb.style.background='#1a4a2ecc';} }
   wallFlash=0;
   gold=START_GOLD; goldTrickleTimer=0; goldSpent=0; goldEarned=START_GOLD;
   damageStats={}; battleStartTime=0;
@@ -710,9 +718,7 @@ function showDraft(){
     generals.filter(gen => !gen.disabled).forEach(gen => {
       const card = document.createElement('div');
       card.className = 'draft-card';
-      const RECOMMENDED = new Set(['guanyu','lubu','zhangfei','zhugeliang','simayi','pangtong']);
-      const recBadge = RECOMMENDED.has(gen.key) ? '<div class="recommend-badge">推荐</div>' : '';
-      card.innerHTML = `${recBadge}<div class="pick-icon">${gen.glyph}</div><div class="pick-name">${gen.name}</div><div class="pick-desc">${gen.desc}</div>`;
+      card.innerHTML = `<div class="pick-icon">${gen.glyph}</div><div class="pick-name">${gen.name}</div>${gen.role?`<div class="pick-role" style="color:${gen.roleColor};border:1px solid ${gen.roleColor};">${gen.role}</div>`:''}<div class="pick-desc">${gen.desc}</div>`;
       card.onclick = () => {
         const idx = draftPicks.findIndex(g=>g.key===gen.key);
         if(idx >= 0){
@@ -876,15 +882,15 @@ function drawCell(cell){
     g.drawPolygon(poly); g.endFill();
     const glow=new PIXI.Graphics(); glow.lineStyle(1.5,0x8b6200,0.45); glow.drawPolygon(hexCorners(HEX_SIZE+8));
     cell.cont.addChild(glow);
-    const t=new PIXI.Text('少',{fontSize:20,fill:'#8b6200',fontWeight:'900'}); t.anchor.set(0.5); t.y=-5; cell.cont.addChild(t);
-    const lvlT=new PIXI.Text('Lv'+baseLvl,{fontSize:9,fill:'#8b6200',fontWeight:'700'}); lvlT.anchor.set(0.5); lvlT.y=11; cell.cont.addChild(lvlT);
+    const t=new PIXI.Text('少',{fontSize:21,fill:'#8b6200',fontWeight:'900',stroke:'#f7efda',strokeThickness:3.5}); t.anchor.set(0.5); t.y=-5; cell.cont.addChild(t);
+    const lvlT=new PIXI.Text('Lv'+baseLvl,{fontSize:11,fill:'#8b6200',fontWeight:'800',stroke:'#f7efda',strokeThickness:3}); lvlT.anchor.set(0.5); lvlT.y=12; cell.cont.addChild(lvlT);
   } else if(cell.state==='locked'){
     g.beginFill(0xbcb4a0,0.18); g.lineStyle(0.8,0xa09888,0.3);
     g.drawPolygon(poly); g.endFill();
   } else if(cell.state==='flippable'){
     g.beginFill(0xf5ecd8); g.lineStyle(2,0x8b6200,0.9);
     g.drawPolygon(poly); g.endFill();
-    const t=new PIXI.Text('？',{fontSize:16,fill:'#7a1a08',fontWeight:'900'}); t.anchor.set(0.5); cell.cont.addChild(t);
+    const t=new PIXI.Text('？',{fontSize:17,fill:'#7a1a08',fontWeight:'900',stroke:'#f7efda',strokeThickness:3}); t.anchor.set(0.5); cell.cont.addChild(t);
   } else if(cell.state==='empty'){
     g.beginFill(0xd0c4a8,0.4); g.lineStyle(0.8,0x9a8868,0.35);
     g.drawPolygon(poly); g.endFill();
@@ -908,10 +914,10 @@ function drawCell(cell){
 
     const glyph = gen ? gen.glyph : bt.glyph;
     const glyphColor = isMaxLvl ? '#8b6200' : bt.css;
-    const t=new PIXI.Text(glyph,{fontSize:16,fill:glyphColor,fontWeight:'800'}); t.anchor.set(0.5); t.y=-4; cell.cont.addChild(t);
+    const t=new PIXI.Text(glyph,{fontSize:18,fill:glyphColor,fontWeight:'900',stroke:'#f7efda',strokeThickness:3.5}); t.anchor.set(0.5); t.y=-4; cell.cont.addChild(t);
     const label = isMaxLvl ? gen.name : 'Lv'+cell.lvl+' '+(gen?gen.name:'');
     const labelColor = isMaxLvl ? '#8b6200' : '#3a2008';
-    const lvlT=new PIXI.Text(label,{fontSize:9,fill:labelColor,fontWeight:'600'}); lvlT.anchor.set(0.5); lvlT.y=12; cell.cont.addChild(lvlT);
+    const lvlT=new PIXI.Text(label,{fontSize:11,fill:labelColor,fontWeight:'800',stroke:'#f7efda',strokeThickness:3}); lvlT.anchor.set(0.5); lvlT.y=13; cell.cont.addChild(lvlT);
 
     // 等级点（Lv2=2点, Lv3=3点，帮助辨认合成目标）
     if(!isMaxLvl && cell.lvl>=2){
@@ -1265,6 +1271,14 @@ function checkLevelUp(){
   baseLvl++;
   const _bc=hexCells.find(c=>c.state==='base'); if(_bc) drawCell(_bc);
   unlockRing();
+  // 城墙升级·震退：把已贴墙的 BOSS 震退到墙外——解决"扩墙把BOSS框进墙内"，并给基地升级一个战术价值（争取喘息）
+  if(boss && (boss.attacking || boss.hasArrived)){
+    boss.y = Math.max(boss.y - HEX_ROW*2.5, -HEX_SIZE*2);   // 向出生方向(上)震退约2.5格
+    boss.cont.x = boss.x; boss.cont.y = boss.y;
+    boss.attacking = false; boss.hasArrived = false; boss.wallTimer = 0;  // 解除围城→需重新逼近（升级次数有限，不可滥用）
+    spawnFloat(boss.x, boss.y-48, '🏯震退BOSS！', 0xffee44, {fontSize:22});
+    shake = Math.max(shake, 12);
+  }
   spawnFloat(cx, cy-55, '基地 Lv'+baseLvl+'!', 0x8b6200);
   burstSound(3); shake=5;
   updateHUD();
@@ -1502,7 +1516,7 @@ function removeEnemy(idx){
 // ===== 战斗 tick =====
 
 function tick(dt){
-  if(gameOver || pendingPick) return;
+  if(gameOver || pendingPick || gamePaused) return;
 
   // 横向滚动偏移已移除，所有容器固定在0
   bgHexC.x = worldC.x = enemyC.x = projC.x = floatC.x = 0;
@@ -1591,6 +1605,24 @@ function tick(dt){
         spawnFloat(e.x,e.y-10,Math.round(e._burnDmg||0)+'🔥',0xff6600);
         if(e.hp<=0){spawnFloat(e.x,e.y-12,'灼杀',0xff6600);removeEnemy(i);continue;}
         updateEnemyHP(e); }
+    }
+
+    // 典韦「灼烧光环」：与典韦亲兵同格(或强化范围内)持续灼烧——dianweiBurnDps 刷新式单值，不可叠加
+    if(e.dianweiBurnUntil && now < e.dianweiBurnUntil && (e.dianweiBurnDps||0)>0){
+      const dwdmg=e.dianweiBurnDps*(app.ticker.deltaMS/1000);
+      e.hp-=dwdmg; trackDmg('dianwei','典韦',dwdmg);
+      if(!e._burnVfx || now-e._burnVfx>450){ e._burnVfx=now; spawnFloat(e.x,e.y-8,'🔥',0xff4400); }
+      if(e.hp<=0){
+        spawnFloat(e.x,e.y-12,'灼杀',0xff4400);
+        if(globalBuffs.fireZone_dianwei){   // 烈焰：灼杀落地火区（格对齐）
+          const fzQ=Math.round((e.x-cx)/HEX_COL), fzR=Math.round((e.y-cy)/HEX_ROW-fzQ*0.5);
+          const fzX=HEX_COL*fzQ+cx, fzY=HEX_ROW*(fzR+fzQ*0.5)+cy;
+          const fzGfx=new PIXI.Graphics(); fzGfx.x=fzX; fzGfx.y=fzY; projC.addChild(fzGfx);
+          fireZones.push({ x:fzX, y:fzY, r:HEX_SIZE, life:5000, maxLife:5000, gfx:fzGfx, dps:e.dianweiBurnDps*0.4 });
+        }
+        removeEnemy(i); continue;
+      }
+      updateEnemyHP(e);
     }
 
     // 周瑜「灼烧叠层」：每层每 0.5s 持续伤害（stun不打断），层数越高烧得越快
@@ -1730,6 +1762,7 @@ function tick(dt){
     }
     if(nearCell){
       if(e.isBoss && bossArrivalHp < 0) bossArrivalHp = baseHP;
+      if(e.isBoss) e.hasArrived = true;   // BOSS 抵达即锁存围城：基地升级扩墙把BOSS包入墙内也不解除攻城（修exploit）
       e.attacking = true;
       e.atkTimer = 0;
       const minDist = HEX_SIZE + (e.size||8) + 2;
@@ -1804,15 +1837,16 @@ function tick(dt){
       spawnFloat(_oc.x, _oc.y-44, '⚠ 曹操·震地锥', 0xffa500);
       blip(90,0.5,'sawtooth',0.2);
     }
-    // BOSS 攻城时钟：每 6s 直接扣城墙 10 HP，不依赖亲兵存在性
-    if(boss.attacking){
+    // BOSS 攻城时钟：每 6s 直接扣城墙，不依赖亲兵存在性；hasArrived 锁存防"扩墙包墙内"免疫
+    if(boss.attacking || boss.hasArrived){
       boss.wallTimer = (boss.wallTimer||0) + app.ticker.deltaMS;
       if(boss.wallTimer >= 6000){
         boss.wallTimer = 0;
-        baseHP = Math.max(0, baseHP - 10);
-        updateHUD(); shake=Math.max(shake,8);
-        spawnProjectile(boss.x, boss.y, cx, cy-20, 0xff2200, 10);
-        spawnFloat(cx, cy-40, '⚔ 曹操·破城 -10', 0xff2200);
+        const siege = Math.ceil(24 * (1 + (difficulty-1)*0.06));   // 破城伤害（含难度缩放），加强威慑
+        baseHP = Math.max(0, baseHP - siege);
+        updateHUD(); shake=Math.max(shake,12);
+        spawnProjectile(boss.x, boss.y, cx, cy-20, 0xff2200, 12);
+        spawnFloat(cx, cy-40, '⚔ 曹操·破城 -'+siege, 0xff2200, {fontSize:17});
         if(baseHP <= 0){ baseHP = 0; endGame(); }
       }
     }
@@ -1871,48 +1905,7 @@ function tick(dt){
     }
   }
 
-  // ⑥ 典韦灼烧光环：范围内敌人每秒受 30% 攻击力灼烧
-  for(const cell of hexCells){
-    if(cell.state!=='revealed' || !cell.general || cell.general.key!=='dianwei') continue;
-    const bt=B_TYPES.find(b=>b.key===cell.category);
-    const burnDpsMul = globalBuffs.burnDpsMul_dianwei || 1;
-    const burnDps = bt ? bt.dps * meleeScale(cell.lvl) * cell.general.dpsMul * (globalBuffs.globalDmg||1) * 0.3 * burnDpsMul : 0;
-    const burnPerTick = burnDps * (app.ticker.deltaMS / 1000);
-    const burnRMul = globalBuffs.burnRadiusMul_dianwei || 1;
-    const burnRHex = Math.max(1, Math.round(HEX_SIZE * 2 * burnRMul / HEX_ROW));
-    // 典韦灼烧光环视觉：常驻橙红脉冲环（每帧重绘，sin 波动 alpha）
-    if(!cell._burnAuraGfx){ cell._burnAuraGfx=new PIXI.Graphics(); projC.addChild(cell._burnAuraGfx); }
-    const _bpulse = 0.35 + 0.25*Math.sin(now/400);
-    cell._burnAuraGfx.clear();
-    cell._burnAuraGfx.lineStyle(2.5, 0xff4400, _bpulse);
-    cell._burnAuraGfx.drawCircle(cell.px, cell.py, burnRHex*HEX_SIZE*0.82);
-    cell._burnAuraGfx.beginFill(0xff4400, _bpulse*0.08);
-    cell._burnAuraGfx.drawCircle(cell.px, cell.py, burnRHex*HEX_SIZE*0.82);
-    cell._burnAuraGfx.endFill();
-    for(let i=enemies.length-1;i>=0;i--){
-      const e=enemies[i];
-      if(hexDistance(cell.px,cell.py,e.x,e.y) <= burnRHex){
-        e.hp -= burnPerTick;
-        trackDmg(cell.general.key, cell.general.name, burnPerTick);
-        if(!e._burnVfx || now - e._burnVfx > 500){
-          e._burnVfx = now;
-          spawnFloat(e.x, e.y-8, '🔥', 0xff3300);
-        }
-        if(e.hp<=0){
-          spawnFloat(e.x,e.y-12,'灼杀',0xff3300);
-          // 典韦「燃地」：灼杀的敌人原地留下燃地陷阱
-          if(globalBuffs.fireZone_dianwei){
-            // 燃地格对齐：吸附到最近六边形中心
-            const fzQ=Math.round((e.x-cx)/HEX_COL), fzR=Math.round((e.y-cy)/HEX_ROW-fzQ*0.5);
-            const fzX=HEX_COL*fzQ+cx, fzY=HEX_ROW*(fzR+fzQ*0.5)+cy;
-            const fzGfx=new PIXI.Graphics(); fzGfx.x=fzX; fzGfx.y=fzY; projC.addChild(fzGfx);
-            fireZones.push({ x:fzX, y:fzY, r:HEX_SIZE, life:5000, maxLife:5000, gfx:fzGfx, dps:burnDps*0.4 });
-          }
-          removeEnemy(i);
-        } else { updateEnemyHP(e); }
-      }
-    }
-  }
+  // ⑥ 典韦「灼烧光环」：已移回亲兵循环（格步进版），见下方 troop ticker dianwei 段
 
   // ⑥b 典韦「燃地」陷阱：持续减速+灼烧
   for(let fi=fireZones.length-1;fi>=0;fi--){
@@ -2144,13 +2137,12 @@ function tick(dt){
             const slowVal = gen.slow;
             const isZhuge = gen.key==='zhugeliang';
             const poisonDps = isZhuge ? finalDmg * 0.2 : 0;
-            // 命中处霜冻六边形闪光（cell-locked，让减速/毒有明确落点）
-            if(isZhuge){
-              const fhc=pixelToHexCenter(tgt.x,tgt.y);
-              const frostG=new PIXI.Graphics(); frostG.x=fhc.x; frostG.y=fhc.y; projC.addChild(frostG);
-              frostG.beginFill(0x66ccff,0.30); frostG.drawPolygon(hexCorners(HEX_SIZE-2)); frostG.endFill();
-              frostG.lineStyle(2,0xaaeeff,0.9); frostG.drawPolygon(hexCorners(HEX_SIZE-2));
-              addFadeAnim(projC, frostG, 280);
+            // 命中处霜冻视觉：单体=小圆光点；AOE模式=多格蓝六边形（在下方 slowAoe 块绘制）
+            if(isZhuge && !globalBuffs.slowAoe_zhugeliang){
+              const frostG=new PIXI.Graphics(); frostG.x=tgt.x; frostG.y=tgt.y; projC.addChild(frostG);
+              frostG.beginFill(0xaaeeff,0.80); frostG.drawCircle(0,0,8); frostG.endFill();
+              frostG.lineStyle(2,0x66ccff,0.9); frostG.drawCircle(0,0,12);
+              addFadeAnim(projC, frostG, 220);
             }
             if(globalBuffs.slowAoe_zhugeliang && isZhuge){
               const slowRHex = 1;   // 减速AOE：以目标格为中心 1 圈
@@ -2329,7 +2321,7 @@ function tick(dt){
       // 弧线倒计时显示
       if(!cell.timerArc){
         cell.timerArc=new PIXI.Graphics();
-        cell.timerText=new PIXI.Text('',{fontSize:9,fill:'#8b6200',fontWeight:'800'});
+        cell.timerText=new PIXI.Text('',{fontSize:10,fill:'#8b6200',fontWeight:'800',stroke:'#f7efda',strokeThickness:2.5});
         cell.timerText.anchor.set(0.5);
         cell.cont.addChild(cell.timerArc); cell.cont.addChild(cell.timerText);
       }
@@ -2441,6 +2433,25 @@ function tick(dt){
     const tdx=nearest.x-t.x, tdy=nearest.y-t.y;
     const tdist=Math.sqrt(tdx*tdx+tdy*tdy);
 
+    // 典韦·灼烧光环（格步进版）：ring 0=亲兵当前格；光晕吸附格心——格内不动，跨格才跳；刷新式DOT
+    if(t.genKey==='dianwei'){
+      const _dtn=performance.now();
+      const burnRing=globalBuffs.burnRadiusMul_dianwei?1:0;
+      const burnDpsV=t.dmg*1.2*(globalBuffs.burnDpsMul_dianwei||1)*(globalBuffs.globalDmg||1);
+      const {q:_cq,r:_cr}=pixelToAxial(t.x,t.y);  // 亲兵当前格轴坐标
+      const _snapX=HEX_COL*_cq+cx, _snapY=HEX_ROW*(_cr+_cq*0.5)+cy;  // 格心像素
+      if(!t._burnGfx){ t._burnGfx=new PIXI.Graphics(); t.cont.addChildAt(t._burnGfx,0); }  // 挂cont→removeTroop自动带走
+      t._burnGfx.clear();
+      const _bp=0.16+0.08*Math.sin(_dtn/240);
+      for(const o of hexDiskOffsets(burnRing)){
+        t._burnGfx.beginFill(0xff4400,_bp); t._burnGfx.drawPolygon(hexPoly((_snapX-t.x)+o.dx,(_snapY-t.y)+o.dy,HEX_SIZE-4)); t._burnGfx.endFill();
+      }
+      for(const e of enemies){
+        if(hexDistance(_snapX,_snapY,e.x,e.y)>burnRing) continue;
+        e.dianweiBurnUntil=_dtn+200; e.dianweiBurnDps=burnDpsV;
+      }
+    }
+
     // 关羽（普通亲兵+大将亲兵）均走下方普攻路径，普攻为主、周期附带剑气/青龙波——不再站桩远程刷屏（见普攻块periodic）
 
     // 亲兵移速：gen.spdMul 接入（赵云2.0→实际跑速翻倍；太史慈buff叠加）
@@ -2522,30 +2533,6 @@ function tick(dt){
               }
             }
           }
-          if(t.gen.aoe){
-            // 张飞·爆裂震地：以命中格为中心，按六边形【环格】判定+高亮（霸王怒→2圈，否则1圈）——遵守六格对齐纪律，不用自由圆/扇形
-            const ringN=(t.gen.key==='zhangfei'&&globalBuffs.aoeRadiusMul_zhangfei)?2:1;
-            const aoeDmg=troopDmg*0.65;
-            const hc=pixelToHexCenter(nearest.x,nearest.y);
-            // 六边形格高亮视觉：命中格+环格逐格点亮
-            const _ag=new PIXI.Graphics(); projC.addChild(_ag);
-            for(const o of hexDiskOffsets(ringN)){
-              _ag.beginFill(0xff5533,0.26); _ag.drawPolygon(hexPoly(hc.x+o.dx, hc.y+o.dy, HEX_SIZE-2)); _ag.endFill();
-              _ag.lineStyle(2,0xff7744,0.85); _ag.drawPolygon(hexPoly(hc.x+o.dx, hc.y+o.dy, HEX_SIZE-2)); _ag.lineStyle(0);
-            }
-            addFadeAnim(projC, _ag, 300);
-            // 环格内敌人受溅射（按六边形格距离判定，排除已被普攻命中的 nearest）
-            for(let j=enemies.length-1;j>=0;j--){
-              const ae=enemies[j]; if(ae===nearest) continue;
-              if(hexDistance(nearest.x,nearest.y,ae.x,ae.y) > ringN) continue;
-              ae.hp-=aoeDmg; spawnFloat(ae.x,ae.y-10,Math.round(aoeDmg)+'',0xff5a5a);
-              trackDmg(t.srcKey, t.srcName, aoeDmg);
-              if(globalBuffs.aoeBurn_zhangfei&&t.gen.key==='zhangfei'){
-                ae.zhangfeiBurnUntil=tnow+2000; ae._burnDmg=aoeDmg*0.3; ae._burnTimer=0;
-              }
-              if(ae.hp<=0){spawnFloat(ae.x,ae.y-12,'溅杀',0xff5a5a);removeEnemy(j);}else{updateEnemyHP(ae);}
-            }
-          }
           if(t.gen.chain){
             let cSrc=nearest, cDmg=troopDmg*0.6; const hit=new Set([nearest]);
             for(let c=0;c<t.gen.chain;c++){
@@ -2560,6 +2547,28 @@ function tick(dt){
             }
           }
         } // end if(t.gen)
+        // 张飞·爆裂震地：genKey判断（修复Lv1-3亲兵无AOE bug）——全级别亲兵触发，霸王怒→2圈
+        if(t.genKey==='zhangfei'){
+          const ringN=globalBuffs.aoeRadiusMul_zhangfei?2:1;
+          const aoeDmg=troopDmg*0.9;
+          const hc=pixelToHexCenter(nearest.x,nearest.y);
+          const _ag=new PIXI.Graphics(); projC.addChild(_ag);
+          for(const o of hexDiskOffsets(ringN)){
+            _ag.beginFill(0xff5533,0.26); _ag.drawPolygon(hexPoly(hc.x+o.dx, hc.y+o.dy, HEX_SIZE-2)); _ag.endFill();
+            _ag.lineStyle(2,0xff7744,0.85); _ag.drawPolygon(hexPoly(hc.x+o.dx, hc.y+o.dy, HEX_SIZE-2)); _ag.lineStyle(0);
+          }
+          addFadeAnim(projC, _ag, 300);
+          for(let j=enemies.length-1;j>=0;j--){
+            const ae=enemies[j]; if(ae===nearest) continue;
+            if(hexDistance(nearest.x,nearest.y,ae.x,ae.y) > ringN) continue;
+            ae.hp-=aoeDmg; spawnFloat(ae.x,ae.y-10,Math.round(aoeDmg)+'',0xff5a5a);
+            trackDmg(t.srcKey, t.srcName, aoeDmg);
+            if(globalBuffs.aoeBurn_zhangfei){
+              ae.zhangfeiBurnUntil=tnow+2000; ae._burnDmg=aoeDmg*0.3; ae._burnTimer=0;
+            }
+            if(ae.hp<=0){spawnFloat(ae.x,ae.y-12,'溅杀',0xff5a5a);removeEnemy(j);}else{updateEnemyHP(ae);}
+          }
+        }
         // 吕布铁骑冲阵：独立3s CD（约每7.5次普攻触发一次），不与普攻频率绑定
         t._chargeCd=(t._chargeCd||0)+troopAtkInterval;
         if(((t.gen && t.gen.charge) || t.charge) && t._chargeCd>=3000){ t._chargeCd=0;
@@ -2567,7 +2576,7 @@ function tick(dt){
             const chgLen=Math.sqrt(chgDx*chgDx+chgDy*chgDy)||1;
             const chgNX=chgDx/chgLen, chgNY=chgDy/chgLen;
             const pierceW=HEX_SIZE*(globalBuffs.chargeWidthMul_lubu||1);
-            const pierceDmg=troopDmg*0.6*(globalBuffs.chargeDmgMul_lubu||1);
+            const pierceDmg=troopDmg*0.85*(globalBuffs.chargeDmgMul_lubu||1);
             // 冲阵光迹：中轴 + 两侧余韵
             const chgGfx=new PIXI.Graphics(); projC.addChild(chgGfx);
             chgGfx.lineStyle(3,0xff6633,0.95);
@@ -2626,7 +2635,7 @@ function tick(dt){
           }
           if(t.hp<=0){
             // 典韦亲兵阵亡：在原格留下火海（殉燃词条可强化）
-            if(t.gen && t.gen.key==='dianwei'){
+            if(t.genKey==='dianwei'){
               const burnDps=(B_TYPES.find(b=>b.key==='advance')||{dps:6}).dps*3;
               const fzQ=Math.round((t.x-cx)/HEX_COL), fzR2=Math.round((t.y-cy)/HEX_ROW-fzQ*0.5);
               const fzX=HEX_COL*fzQ+cx, fzY=HEX_ROW*(fzR2+fzQ*0.5)+cy;
@@ -2921,7 +2930,7 @@ function buildWarReport(isWin, failedWave){
   const bossArrPct = bossArrivalHp >= 0 ? Math.round(bossArrivalHp / maxHP * 100) + '%' : '未出现';
   const bossKillStr = bossKillTime >= 0 ? bossKillTime + '秒' : (bossArrivalHp >= 0 ? '存活' : '—');
 
-  const R = (label, val, color) => `<div style="display:flex;justify-content:space-between;font-size:10.5px;padding:1px 0">
+  const R = (label, val, color) => `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1px 0">
     <span style="color:#4a2808">${label}</span><span style="color:${color||'#4a2808'}">${val}</span></div>`;
 
   let dpsRows = '';
@@ -2930,25 +2939,25 @@ function buildWarReport(isWin, failedWave){
     const dps2 = Math.round(st.totalDmg/elapsed);
     const flipEff = st.flipCount > 0 ? Math.round(st.totalDmg / st.flipCount) + '伤/翻' : '—';
     const nameColor = st.name && draftPicks.find(g=>g.name===st.name&&g.category==='advance') ? '#cc3322' : '#1133aa';
-    dpsRows += `<div style="font-size:10.5px;color:${nameColor};padding:1px 0">${st.name} ×${st.flipCount||0}翻  ${Math.round(st.totalDmg)}伤 <span style="color:#8b6200">(${pct}%)</span> · <span style="color:#1133aa">${flipEff}</span></div>`;
+    dpsRows += `<div style="font-size:11.5px;color:${nameColor};padding:1px 0">${st.name} ×${st.flipCount||0}翻  ${Math.round(st.totalDmg)}伤 <span style="color:#8b6200">(${pct}%)</span> · <span style="color:#1133aa">${flipEff}</span></div>`;
   }
 
-  return `<div style="margin-top:8px;width:250px;background:#e8d8b8;border:1.5px solid #7a5838;border-radius:4px;padding:9px 12px;text-align:left;font-size:10.5px">
-    <div style="color:#7a1a08;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.6.1 ──</div>
+  return `<div style="margin-top:8px;width:250px;background:#e8d8b8;border:1.5px solid #7a5838;border-radius:4px;padding:9px 12px;text-align:left;font-size:11.5px">
+    <div style="color:#7a1a08;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.7.2 ──</div>
     ${R('阵容', lineup, '#2a1808')}
-    <div style="font-size:10.5px;padding:1px 0"><span style="color:#4a2808">结果</span> ${resultStr} &nbsp;<span style="color:#4a2808">时长</span> <span style="color:#1133aa">${elapsedStr}</span> &nbsp;<span style="color:#4a2808">翻格</span> <span style="color:#8b6200">${totalFlips}次</span></div>
+    <div style="font-size:11.5px;padding:1px 0"><span style="color:#4a2808">结果</span> ${resultStr} &nbsp;<span style="color:#4a2808">时长</span> <span style="color:#1133aa">${elapsedStr}</span> &nbsp;<span style="color:#4a2808">翻格</span> <span style="color:#8b6200">${totalFlips}次</span></div>
     <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
     <div style="color:#4a2808;font-size:10px;margin-bottom:2px">各将伤害占比</div>
     ${dpsRows}
     <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
     <div style="color:#7a1a08;font-size:10px;margin-bottom:2px">★ 近战专项</div>
-    <div style="font-size:10.5px;color:#4a2808">拦截 <span style="color:#8b6200">${interceptCount}</span>怪 &nbsp;·&nbsp; 护盾承伤 <span style="color:#8b6200">${wallDmgAbsorbed}</span> (<span style="color:#8b6200">${shieldPct}%</span>) &nbsp;·&nbsp; 峰值小兵 <span style="color:#8b6200">${peakTroopCount}</span></div>
+    <div style="font-size:11.5px;color:#4a2808">拦截 <span style="color:#8b6200">${interceptCount}</span>怪 &nbsp;·&nbsp; 护盾承伤 <span style="color:#8b6200">${wallDmgAbsorbed}</span> (<span style="color:#8b6200">${shieldPct}%</span>) &nbsp;·&nbsp; 峰值小兵 <span style="color:#8b6200">${peakTroopCount}</span></div>
     <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
     <div style="color:#4a2808;font-size:10px;margin-bottom:2px">翻格效率</div>
-    <div style="font-size:10.5px;color:#4a2808">全局 <span style="color:#1133aa">${totalFlips > 0 ? Math.round(total / totalFlips) : 0}伤/翻</span> &nbsp;·&nbsp; 共翻 <span style="color:#8b6200">${totalFlips}次</span> &nbsp;·&nbsp; 总伤 <span style="color:#8b6200">${Math.round(total)}</span></div>
+    <div style="font-size:11.5px;color:#4a2808">全局 <span style="color:#1133aa">${totalFlips > 0 ? Math.round(total / totalFlips) : 0}伤/翻</span> &nbsp;·&nbsp; 共翻 <span style="color:#8b6200">${totalFlips}次</span> &nbsp;·&nbsp; 总伤 <span style="color:#8b6200">${Math.round(total)}</span></div>
     <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
     <div style="color:#4a2808;font-size:10px;margin-bottom:2px">BOSS</div>
-    <div style="font-size:10.5px;color:#4a2808">到达时城墙 <span style="color:#8b6200">${bossArrPct}</span> &nbsp;·&nbsp; 被杀于 <span style="color:#8b6200">${bossKillStr}</span></div>
+    <div style="font-size:11.5px;color:#4a2808">到达时城墙 <span style="color:#8b6200">${bossArrPct}</span> &nbsp;·&nbsp; 被杀于 <span style="color:#8b6200">${bossKillStr}</span></div>
   </div>`;
 }
 
@@ -2961,6 +2970,15 @@ function endGame(){
   if(inner) inner.innerHTML = `<div class="go-text">基地陷落</div>${reportHtml}<button id="btnRestart2" style="margin-top:10px;background:#7a1a08;color:#f5e0c0;border:none;border-radius:2px;padding:9px 22px;font-size:15px;cursor:pointer;">重开</button>`;
   const btn2 = document.getElementById('btnRestart2');
   if(btn2) btn2.onclick=()=>{ readTune(); startGame(); };
+}
+
+function togglePause(){
+  if(gameOver || pendingPick) return;   // 结算/选卡时不接管暂停（选卡本身已暂停）
+  gamePaused = !gamePaused;
+  const ov=document.getElementById('pauseOverlay');
+  const btn=document.getElementById('pauseBtn');
+  if(ov) ov.style.display = gamePaused ? 'flex' : 'none';
+  if(btn){ btn.textContent = gamePaused ? '▶' : '⏸'; btn.style.background = gamePaused ? '#7a1a08cc' : '#1a4a2ecc'; }
 }
 
 function trackDmg(key, name, amt){
