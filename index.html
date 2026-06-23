@@ -259,7 +259,7 @@ body { display:flex; flex-direction:column; align-items:center; }
 
 <script>
 /* ============================================================
-   灰盒 v1.8.0 — 基地在底部·只能向上扩·格子耗尽升级·指数数值压力·武将炸裂特效
+   灰盒 v1.8.3 — 基地在底部·只能向上扩·格子耗尽升级·指数数值压力·武将炸裂特效
    ============================================================ */
 
 // ===== TUNE =====
@@ -962,9 +962,9 @@ function beginCombat(){
   dianweiBurnGfx = new PIXI.Graphics(); projC.addChild(dianweiBurnGfx); // 典韦灼烧：全局共享
   updateHUD();
   setNote(`已选：${draftPicks.map(g=>g.name).join('·')} | 翻牌${UPGRADE_FLIPS.length}次升级·逐步解锁全地格`);
+  guideStep = isFirstGame ? 0 : 3;   // 每局重置：首局显示引导(0)，后续干净跳过(3)，修复重开/难度+残留旧 1/2 导致的错误脉冲
   if(isFirstGame){
     isFirstGame=false;
-    guideStep=0;
     showGuideHint('☝ 点击 ? 格翻牌，建造武将');
   }
   if(PVP_MODE){ drawEnemyClusterOutline(); buildGoldMines(); }
@@ -1974,6 +1974,8 @@ function tick(dt){
       const atkInterval = (globalBuffs.tauntAtkSlow_caoren && e._taunted) ? 3333 : 2000; // 曹仁镇慑：攻速-40%
       if(e.atkTimer >= atkInterval){
         e.atkTimer = 0;
+        // PvP 攻城伤害封顶：pvpSpawnEnemyWave 的 waveCount 无上限（PvE 在 spawnWave 封 16），不夹会后期放大数倍击穿基地
+        const _wallDmg = Math.ceil((1 + (PVP_MODE ? Math.min(waveCount,6) : waveCount) * 0.25) * (1 + (difficulty-1)*0.03));
         // GAP3: 攻击范围内有近战亲兵时优先打兵（护盾层）
         let troopTarget = null, minTD = Infinity;
         for(const tr of troops){
@@ -1982,7 +1984,7 @@ function tick(dt){
           if(td < HEX_SIZE * 2.5 && td < minTD){ minTD = td; troopTarget = tr; }
         }
         if(troopTarget){
-          const troopDmg = Math.ceil((1 + waveCount * 0.25) * (1 + (difficulty-1)*0.03));
+          const troopDmg = _wallDmg;
           wallDmgAbsorbed += troopDmg;
           troopTarget.hp -= troopDmg;
           updateTroopHP(troopTarget);
@@ -1992,7 +1994,7 @@ function tick(dt){
             if(ti >= 0){ spawnFloat(troopTarget.x, troopTarget.y - 18, '阵亡', 0xff4444); removeTroop(ti); }
           }
         } else {
-          baseHP -= Math.ceil((1 + waveCount * 0.25) * (1 + (difficulty-1)*0.03));
+          baseHP -= _wallDmg;
           shake=2; wallFlash=6;
           if(baseHP<=0){ baseHP=0; endGame(); }
           updateHUD();
@@ -2031,9 +2033,8 @@ function tick(dt){
       const dx=_twp.x-e.x, dy=_twp.y-e.y;
       const dist=Math.sqrt(dx*dx+dy*dy);
       if(dist<0.5) continue;
-      const spdScale = globalBuffs.globalSlow || 1;
       const slowDebuff = (e.slowUntil && now < e.slowUntil) ? Math.max(e.isBoss?0.5:0.15, e.slowFactor) : 1;
-      const spd=e.speed*spdScale*slowDebuff*dt*0.7;
+      const spd=e.speed*slowDebuff*dt*0.7;
       e.x+=dx/dist*spd; e.y+=dy/dist*spd;
       e.cont.x=e.x; e.cont.y=e.y;
       continue;
@@ -2065,7 +2066,7 @@ function tick(dt){
       const cd = Math.sqrt((e.x-c.px)**2+(e.y-c.py)**2);
       if(cd < HEX_SIZE + (e.size||8) + 4 && cd < nearCD){ nearCD=cd; nearCell=c; }
     }
-    if(nearCell){
+    if(nearCell && !(PVP_MODE && e.mineTarget)){
       if(e.isBoss && bossArrivalHp < 0) bossArrivalHp = baseHP;
       if(e.isBoss) e.hasArrived = true;   // BOSS 抵达即锁存围城：基地升级扩墙把BOSS包入墙内也不解除攻城（修exploit）
       e.attacking = true;
@@ -2085,9 +2086,8 @@ function tick(dt){
     const dx=_ewp.x-e.x, dy=_ewp.y-e.y;
     const dist=Math.sqrt(dx*dx+dy*dy);
     if(dist < 1) continue;
-    const spdScale = globalBuffs.globalSlow || 1;
     const slowDebuff = (e.slowUntil && now < e.slowUntil) ? Math.max(e.isBoss?0.5:0.15, e.slowFactor) : 1;
-    const spd=e.speed*spdScale*slowDebuff*dt*0.7;
+    const spd=e.speed*slowDebuff*dt*0.7;
     e.x+=dx/dist*spd; e.y+=dy/dist*spd;
     e.cont.x=e.x; e.cont.y=e.y;
     // PvP 领地占领：敌方士兵走过的格标记为敌方
@@ -2229,7 +2229,7 @@ function tick(dt){
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
       if(sameHexCell(e.x,e.y,fz.x,fz.y)){
-        e.hp-=resDmg(fzDmg,'法术',e.armType); e.slowFactor=fz.slowFactor||0.6; e.slowUntil=now+500;
+        const _fzd=resDmg(fzDmg,'法术',e.armType); e.hp-=_fzd; trackDmg('dianwei','典韦',_fzd); e.slowFactor=fz.slowFactor||0.6; e.slowUntil=now+500;
         if(e.hp<=0){spawnFloat(e.x,e.y-12,'燃地杀',0xff5500);removeEnemy(i);}
         else{updateEnemyHP(e);}
       }
@@ -2486,17 +2486,22 @@ function tick(dt){
             }
           }
 
-          // 张飞AOE（霸王怒：半径扩大；火爆：灼烧标记）
+          // 张飞AOE（霸王怒：半径扩大；火爆：灼烧标记）——六格纪律：按整格环命中，与亲兵路径(genKey判定)一致
           if(gen && gen.aoe){
-            const aoeRMul = (gen.key==='zhangfei' && globalBuffs.aoeRadiusMul_zhangfei) ? globalBuffs.aoeRadiusMul_zhangfei : 1;
-            const aoeDmg=finalDmg*0.5, aoeR=HEX_SIZE*2*aoeRMul;
-            // AOE爆炸圆圈视觉
-            const _ag=new PIXI.Graphics(); _ag.lineStyle(4,0xff5533,0.9); _ag.drawCircle(0,0,aoeR); _ag.x=tgt.x; _ag.y=tgt.y; projC.addChild(_ag);
-            addFadeAnim(projC, _ag, 280, t => _ag.scale.set(1 + t/180));
+            const ringN = (gen.key==='zhangfei' && globalBuffs.aoeRadiusMul_zhangfei) ? 2 : 1;
+            const aoeDmg=finalDmg*0.5;
+            // AOE 爆炸：按 hex 盘格绘制（弃用欧式圆，对齐六格纪律）
+            const _ahc=pixelToHexCenter(tgt.x,tgt.y);
+            const _ag=new PIXI.Graphics(); projC.addChild(_ag);
+            for(const o of hexDiskOffsets(ringN)){
+              _ag.beginFill(0xff5533,0.22); _ag.drawPolygon(hexPoly(_ahc.x+o.dx, _ahc.y+o.dy, HEX_SIZE-2)); _ag.endFill();
+              _ag.lineStyle(2,0xff7744,0.85); _ag.drawPolygon(hexPoly(_ahc.x+o.dx, _ahc.y+o.dy, HEX_SIZE-2)); _ag.lineStyle(0);
+            }
+            addFadeAnim(projC, _ag, 280);
             for(let ai=enemies.length-1;ai>=0;ai--){
               const ae=enemies[ai]; if(ae===tgt) continue;
-              const ad=Math.sqrt((ae.x-tgt.x)**2+(ae.y-tgt.y)**2);
-              if(ad<aoeR){
+              if(hexDistance(tgt.x,tgt.y,ae.x,ae.y) > ringN) continue;
+              {
                 ae.hp-=aoeDmg; spawnFloat(ae.x,ae.y-10,Math.round(aoeDmg)+'',0xff5a5a);
                 trackDmg(cell.building, gen&&gen.name, aoeDmg);
                 if(globalBuffs.aoeBurn_zhangfei && gen.key==='zhangfei'){
@@ -3319,7 +3324,7 @@ function buildWarReport(isWin, failedWave){
   }
 
   return `<div style="margin-top:8px;width:250px;background:#e8d8b8;border:1.5px solid #7a5838;border-radius:4px;padding:9px 12px;text-align:left;font-size:11.5px">
-    <div style="color:#7a1a08;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.8.0 ──</div>
+    <div style="color:#7a1a08;font-size:11px;font-weight:800;margin-bottom:5px;text-align:center">── 战报 · v1.8.3 ──</div>
     ${R('阵容', lineup, '#2a1808')}
     <div style="font-size:11.5px;padding:1px 0"><span style="color:#4a2808">结果</span> ${resultStr} &nbsp;<span style="color:#4a2808">时长</span> <span style="color:#1133aa">${elapsedStr}</span> &nbsp;<span style="color:#4a2808">翻格</span> <span style="color:#8b6200">${totalFlips}次</span></div>
     <div style="border-top:1px solid #9a7848;margin:5px 0 3px"></div>
@@ -3479,7 +3484,7 @@ function pvpDetourGoal(t, gx, gy){
   if(!PVP_MODE) return { x: gx, y: gy };
   const goalAcross = (t.y - midlineY) * (gy - midlineY) < 0;      // 目标在中线对岸
   const selfInBand = Math.abs(t.y - midlineY) < HEX_ROW * 3.3;    // 自身已在水域带
-  if(!goalAcross && !selfInBand) return { x: gx, y: gy };
+  if(!goalAcross && !selfInBand){ t._bypassSide = undefined; return { x: gx, y: gy }; }   // 离开水域带→清除绕行侧记忆，再入按当时所在侧重算（防越线后仍按旧侧绕行的振荡）
   let side;
   if(Math.abs(gx - cx) > HEX_COL){ side = gx >= cx ? 1 : -1; }    // 目标偏一侧→走该侧车道直达
   else { if(t._bypassSide === undefined) t._bypassSide = (t.x <= cx ? -1 : 1); side = t._bypassSide; } // 目标居中→分摊
@@ -3527,6 +3532,7 @@ function buildGoldMines(){
 const PLAYER_MINER_CAP = 2;
 function maybeAssignPlayerMiner(t){
   if(!PVP_MODE || !t) return;
+  if(t.isGeneralTroop) return;                  // 满级武将/大将不挪去采矿，保留其进攻目标(initialTarget)；非满级集结亲兵仍可采矿
   let cur = 0;
   for(const x of troops) if(x.mineTarget) cur++;
   if(cur >= PLAYER_MINER_CAP) return;
@@ -3645,6 +3651,7 @@ function pvpSpawnEnemyWave(){
     const wic=new PIXI.Graphics(); drawWeaponIcon(wic, ENEMY_BUILD_GENS[(waveCount + i) % ENEMY_BUILD_GENS.length], 8); cont.addChild(wic);
     const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-12,16,3); hpBg.endFill(); cont.addChild(hpBg);
     const hpFill=new PIXI.Graphics(); cont.addChild(hpFill);
+    const statusRing=new PIXI.Graphics(); cont.addChild(statusRing); e.statusRing=statusRing;   // 减速/嘲讽/中毒状态环（与 spawnGroup 一致，否则 PvP 敌兵无状态视觉反馈）
     e.hpFill=hpFill; e.cont=cont;
     updateEnemyHP(e);
     enemyC.addChild(cont);
