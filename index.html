@@ -827,15 +827,16 @@ function setupGeometry(){
   cx = W/2;
   if(PVP_MODE){
     // PvP 镜像双场世界：纵深动态 = 1.5 屏，玩家基地在世界底、敌方基地镜像在世界顶
-    WORLD_ROWS = Math.round(1.5 * H / HEX_ROW) - 6; // 中段缩行，缩短战场拉锯纵深
+    WORLD_ROWS = 13; // 固定13行：所有分辨率下领地格数量一致，消除分辨率差异
     WORLD_H = WORLD_ROWS * HEX_ROW;
     midlineY = WORLD_H / 2;
     cy = WORLD_H - 2 * HEX_ROW;       // 玩家基地距世界底2格
     enemyCy = WORLD_H - cy;           // 关于中线对称且网格对齐
     PVP_WATER_X_MIN = cx - HEX_COL * 1.5;
     PVP_WATER_X_MAX = cx + HEX_COL * 1.5;
-    PVP_WATER_Y_MIN = midlineY - Math.min(HEX_ROW * 3.0, midlineY - enemyCy - HEX_ROW * 2);
-    PVP_WATER_Y_MAX = midlineY + Math.min(HEX_ROW * 3.0, midlineY - enemyCy - HEX_ROW * 2);
+    // 水域：中线两侧对称各1.5行高，固定写死避免公式随分辨率失效
+    PVP_WATER_Y_MIN = midlineY - HEX_ROW * 1.5;
+    PVP_WATER_Y_MAX = midlineY + HEX_ROW * 1.5;
   } else {
     WORLD_H = H;
     // 平顶布局：基地偏下居中，领地向上(敌方向)铺展，后排格留在基地下方
@@ -904,7 +905,17 @@ function selectMode(isPvp){
   modeSelecting = false;
   const ov = document.getElementById('modeSelectOverlay');
   if(ov) ov.style.display = 'none';
-  setupGeometry(); // 模式已定，按模式计算几何
+  // 先显隐 enemyHpTopBar，再重算 H，防止顶栏占位后底部 hpHud 被遮
+  const _eHpTopBar = document.getElementById('enemyHpTopBar');
+  if(_eHpTopBar) _eHpTopBar.style.display = PVP_MODE ? 'flex' : 'none';
+  const area = document.getElementById('gameArea');
+  const tuneH  = document.getElementById('tune')?.offsetHeight  || 40;
+  const hudH   = document.getElementById('hpHud')?.offsetHeight || 80;
+  const topBarH = PVP_MODE ? (_eHpTopBar?.offsetHeight || 0) : 0;
+  H = Math.max(window.innerHeight - tuneH - hudH - topBarH, 400);
+  area.style.height = H + 'px';
+  app.renderer.resize(W, H);
+  setupGeometry(); // 模式已定，按正确的 H 计算几何
   startGame();
 }
 
@@ -1855,7 +1866,8 @@ function tick(dt){
     }
     while(enemyGoldTrickleTimer >= MINE_INCOME_MS){
       enemyGoldTrickleTimer -= MINE_INCOME_MS;
-      enemyGold += ENEMY_TRICKLE_AMOUNT;
+      // 动态收入：镜像玩家建筑产金逻辑——每已翻格贡献 10G（介于进攻12/防守8之间），起步8，上限80
+      enemyGold += Math.min(80, 8 + aiFlips * 10);
     }
     // 金矿占领（部队进入即占，双方同在=保持现主）+ 产金
     for(const m of goldMines){
@@ -2101,6 +2113,8 @@ function tick(dt){
     let nearCell=null, nearCD=Infinity;
     for(const c of hexCells){
       if(c.state==='locked') continue;
+      // PvP：敌方兵只对真实建筑/基地停止推进，空格/可翻格穿行继续推；PvE 保持原行为（在外圈停战）
+      if(PVP_MODE && e.isPvpTroop && c.state!=='revealed' && c.state!=='base') continue;
       const cd = Math.sqrt((e.x-c.px)**2+(e.y-c.py)**2);
       if(cd < HEX_SIZE + (e.size||8) + 4 && cd < nearCD){ nearCD=cd; nearCell=c; }
     }
@@ -3647,7 +3661,7 @@ function drawEnemyClusterOutline(){
   for(const [q,r,k] of cells){
     const ex = cx + q * HEX_COL;
     const ey = enemyCy - HEX_ROW * (r + q*0.5);   // 关于中线镜像：朝中线向下铺展
-    enemyClusterCells.push({ ex, ey, k });
+    enemyClusterCells.push({ ex, ey, k, lvl: 1 });
     g.lineStyle(1.5, 0x7a2820, 0.85);
     g.beginFill(k==='base'?0xc0503a:0xcc7060, k==='base'?0.5:0.2);
     g.drawPolygon(hexPoly(ex, ey, HEX_SIZE-2));
@@ -3694,7 +3708,8 @@ function updateEnemyBuildVisual(){
         for(const arr of [GENERALS.advance, GENERALS.defense]){
           const g = arr.find(x=>x.key===gk); if(g){ gl = g.glyph; break; }
         }
-        sub._lbl.text = gl;
+        const lvl = (c.lvl && c.lvl > 1) ? ' Lv'+c.lvl : '';
+        sub._lbl.text = gl + lvl;
       }
     } else sub.visible = false;
   }
@@ -3707,6 +3722,15 @@ function aiTryFlip(){
   if(enemyGold < cost) return;                          // 攒钱不够，等下次决策
   enemyGold -= cost;
   aiFlips++;
+  // AI 合成升级（30%概率）：随机提升一个已建格的等级（模拟玩家合成）
+  if(aiFlips >= 3 && Math.random() < 0.30){
+    const buildable = enemyClusterCells.filter(c => c.k !== 'base');
+    const candidates = buildable.slice(0, aiFlips).filter(c => (c.lvl||1) < 4);
+    if(candidates.length > 0){
+      const t2 = candidates[Math.floor(Math.random() * candidates.length)];
+      t2.lvl = (t2.lvl || 1) + 1;
+    }
+  }
   updateEnemyBuildVisual();   // 翻格即点亮敌方"已建"格
   const upDone = aiLvl - 1;                             // 升级判定：与玩家同阈值 UPGRADE_FLIPS
   if(upDone < UPGRADE_FLIPS.length && aiFlips >= UPGRADE_FLIPS[upDone]){
@@ -3818,8 +3842,10 @@ function pvpEndMatch(winner, reason){
 }
 
 // PvP 领地占格：单位走到某像素点时，标记该轴坐标为归属方并重绘覆盖层
+// 过滤：跳过玩家建造区（hexCells 格），避免亲兵从基地出发时把基地格全计为占领
 function pvpOccupyAt(px, py, side){
   const {q, r} = pixelToAxial(px, py);
+  if(hexCells.some(c => c.q === q && c.r === r)) return;
   const key = q+','+r;
   if(pvpTerritory.get(key) !== side){ pvpTerritory.set(key, side); pvpTerrDirty = true; }
 }
