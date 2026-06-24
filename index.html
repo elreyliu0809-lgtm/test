@@ -216,9 +216,8 @@ body { display:flex; flex-direction:column; align-items:center; }
         <div class="hud-lbl">格</div>
       </div>
     </div>
-    <div class="hud-card">
+    <div class="hud-card" id="waveHudCard">
       <div class="hud-lbl">波次</div>
-      <div class="hud-val blue" id="waveCountEl">0/15</div>
       <div class="hud-lbl">下一波 <span id="waveTimerEl">5s</span></div>
     </div>
   </div>
@@ -533,7 +532,7 @@ function laneWalkable(q, r) {
   if(PVP_MODE){
     // PvP 中央水域不可走（兵力绕行道路），其余全可走（镜像双场无三路障碍）
     const px = cx + q*HEX_COL, py = cy + HEX_ROW*(r + q*0.5);
-    if(Math.abs(py - midlineY) < HEX_ROW*3.5 && Math.abs(px - cx) < HEX_COL*1.5) return false;
+    if(py > PVP_WATER_Y_MIN && py < PVP_WATER_Y_MAX && Math.abs(px - cx) < HEX_COL*1.5) return false;
     return true;
   }
   const p = hexToPixel(q, r, cx, cy);
@@ -604,9 +603,9 @@ function buildBgHexGrid() {
         // 维度②：中央水域 + 绕行道路覆盖底色
         if(PVP_WATER){
           const distY = Math.abs(d), distX = Math.abs(px - cx);
-          if(distY < HEX_ROW * 3.5 && distX < HEX_COL * 1.5)
+          if(py > PVP_WATER_Y_MIN && py < PVP_WATER_Y_MAX && distX < HEX_COL * 1.5)
             { fill = 0x2d5e88; alpha = 0.85; }       // 水域（深蓝）
-          else if(distY < HEX_ROW * 3.5 && distX < HEX_COL * 3.6)
+          else if(py > PVP_WATER_Y_MIN && py < PVP_WATER_Y_MAX && distX < HEX_COL * 3.6)
             { fill = 0xb89a60; alpha = 0.65; }       // 绕行道路（砂石）
         }
         g.lineStyle(1, 0x8a6030, 0.4);
@@ -835,8 +834,8 @@ function setupGeometry(){
     enemyCy = WORLD_H - cy;           // 关于中线对称且网格对齐
     PVP_WATER_X_MIN = cx - HEX_COL * 1.5;
     PVP_WATER_X_MAX = cx + HEX_COL * 1.5;
-    PVP_WATER_Y_MIN = midlineY - HEX_ROW * 3.5;
-    PVP_WATER_Y_MAX = midlineY + HEX_ROW * 3.5;
+    PVP_WATER_Y_MIN = midlineY - Math.min(HEX_ROW * 3.0, midlineY - enemyCy - HEX_ROW * 2);
+    PVP_WATER_Y_MAX = midlineY + Math.min(HEX_ROW * 3.0, midlineY - enemyCy - HEX_ROW * 2);
   } else {
     WORLD_H = H;
     // 平顶布局：基地偏下居中，领地向上(敌方向)铺展，后排格留在基地下方
@@ -940,6 +939,7 @@ function startGame(){
   if(_matchTimerEl){ _matchTimerEl.style.display=PVP_MODE?'block':'none'; _matchTimerEl.textContent='3:00'; _matchTimerEl.style.color='#f5e0c0'; }
   { const _thc=document.getElementById('terrHudCard'); if(_thc) _thc.style.display=PVP_MODE?'flex':'none'; }
   { const _mhg=document.getElementById('mineHudGroup'); if(_mhg) _mhg.style.display=PVP_MODE?'contents':'none'; }  // 矿数读出仅 PvP 显示（PvE 无矿，display:contents 让3子项融入底栏flex）
+  { const _whc=document.getElementById('waveHudCard'); if(_whc) _whc.style.display=PVP_MODE?'none':''; } // PvP 不需要波次信息
   document.getElementById('mergeHint').style.display='none';
   document.getElementById('gameOverlay').style.display='none';
   document.getElementById('pickOverlay').style.display='none';
@@ -1047,15 +1047,10 @@ function buildHexGrid(){
 }
 
 function drawLanes(){
+  if(PVP_MODE) return; // PvP 无三路出兵门，跳过
   const g = new PIXI.Graphics();
   // 三路淡色通道
   const laneHalf = (LANES[1]-LANES[0]) * 0.46;
-  g.lineStyle(0);
-  for(const lx of LANES){
-    g.beginFill(0xc8a860, 0.06);
-    g.drawRoundedRect(lx-laneHalf, -HEX_SIZE, laneHalf*2, LANE_MERGE_Y+HEX_SIZE, 10);
-    g.endFill();
-  }
   // 障碍六边形地格（分割左/中/右路，替代竖线）
   for(const bq of [-2, 2]){
     const bpx = cx + HEX_COL * bq;
@@ -1073,10 +1068,6 @@ function drawLanes(){
       g.beginFill(0x5a3820, 0.25); g.drawCircle(bpx+8, bpy-6, 2.5); g.endFill();
     }
   }
-  // 汇聚提示线
-  g.lineStyle(1.5, 0x7a5838, 0.3);
-  g.moveTo(LANES[0]-laneHalf, LANE_MERGE_Y); g.lineTo(LANES[2]+laneHalf, LANE_MERGE_Y);
-  g.lineStyle(0);
   // 出兵门：三路网格对齐六边形（取代圆形传送门）
   const portalDefs = [
     {q: -3, color: 0x1133aa, css: '#1133aa', label: '水'},
@@ -3608,11 +3599,11 @@ function buildGoldMines(){
   goldMines = [];
   // 5 矿全部初始中立，双方靠采矿兵寻路抢占。近矿在各自后角(需绕远)，中线一对+中心=争夺。
   const LX = cx - HEX_COL * 2.5;     // 左路：贴中线争夺
-  const RX = cx + HEX_COL * 3.3;     // 右后角：近矿
+  const RX = cx + HEX_COL * 4.3;     // 右后角：近矿（右上移1格，离基地更远）
   const CX5 = cx + HEX_COL * 2;       // 中心偏右
   const defs = [
-    { x: RX,  y: cy        - HEX_ROW * 0.5, owner: 'neutral' }, // M1 玩家·右下后角（近矿）
-    { x: RX,  y: enemyCy   + HEX_ROW * 0.5, owner: 'neutral' }, // M2 敌方·右上后角（镜像近矿）
+    { x: RX,  y: cy        - HEX_ROW * 1.5, owner: 'neutral' }, // M1 玩家·右下后角（近矿）
+    { x: RX,  y: enemyCy   + HEX_ROW * 1.5, owner: 'neutral' }, // M2 敌方·右上后角（镜像近矿）
     { x: LX,  y: midlineY  + HEX_ROW * 3,   owner: 'neutral' }, // M3 左路·玩家侧贴中线（争夺）
     { x: LX,  y: midlineY  - HEX_ROW * 3,   owner: 'neutral' }, // M4 左路·敌方侧贴中线（镜像争夺）
     { x: CX5, y: midlineY,                  owner: 'neutral' }, // M5 中心偏右贴中线（中段争夺）
@@ -3679,7 +3670,9 @@ function updateEnemyBuildVisual(){
     const sub = new PIXI.Container();
     const hexG = new PIXI.Graphics(); sub.addChild(hexG);
     const icon = new PIXI.Graphics(); sub.addChild(icon);
-    sub._hexG = hexG; sub._icon = icon;
+    const lbl = new PIXI.Text('', {fontSize:11, fill:'#ffe0cc', fontWeight:'900', stroke:'#331111', strokeThickness:2.5});
+    lbl.anchor.set(0.5); lbl.y = 6; sub.addChild(lbl);
+    sub._hexG = hexG; sub._icon = icon; sub._lbl = lbl;
     enemyBuildC.addChild(sub);
   }
   for(let i=0;i<enemyBuildC.children.length;i++){
@@ -3694,7 +3687,15 @@ function updateEnemyBuildVisual(){
       sub._hexG.drawPolygon(hexPoly(0, 0, HEX_SIZE-3));
       sub._hexG.endFill();
       sub._icon.clear();
-      drawWeaponIcon(sub._icon, ENEMY_BUILD_GENS[i % ENEMY_BUILD_GENS.length], HEX_SIZE*0.55);
+      const gk = ENEMY_BUILD_GENS[i % ENEMY_BUILD_GENS.length];
+      drawWeaponIcon(sub._icon, gk, HEX_SIZE*0.55);
+      if(sub._lbl){
+        let gl = gk;
+        for(const arr of [GENERALS.advance, GENERALS.defense]){
+          const g = arr.find(x=>x.key===gk); if(g){ gl = g.glyph; break; }
+        }
+        sub._lbl.text = gl;
+      }
     } else sub.visible = false;
   }
 }
@@ -3835,6 +3836,7 @@ function pvpTerrDraw(){
     pvpTerrGfx.drawPolygon(hexPoly(px2, py2, HEX_SIZE - 2));
     pvpTerrGfx.endFill();
   }
+  updateHUD(); // 领地格变化时同步刷新 HUD 占地计数
 }
 
 boot();
