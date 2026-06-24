@@ -79,27 +79,34 @@ body { display:flex; flex-direction:column; align-items:center; }
 .pick-desc { font-size:11px; color:#4a2808; margin-top:3px; }
 
 /* 战前选将 */
-#draftOverlay { position:absolute; inset:0; background:#ede0c4f5; display:none; flex-direction:column;
-  justify-content:center; align-items:center; z-index:30; padding:16px; overflow-y:auto; }
+#draftOverlay { position:absolute; inset:0; background:#ede0c4f8; display:none; flex-direction:column;
+  justify-content:center; align-items:center; z-index:30; padding:40px 16px 16px; overflow-y:auto; }
 #draftTitle { color:#7a1a08; font-size:22px; font-weight:800; margin-bottom:4px; }
 #draftDesc { color:#4a2808; font-size:12px; margin-bottom:16px; }
 #draftGrid { display:flex; flex-direction:column; gap:12px; width:100%; max-width:420px; }
 .draft-row { display:flex; flex-direction:column; gap:6px; }
-.draft-row-title { font-size:12px; color:#7a5838; font-weight:700; padding-left:4px; }
+.draft-row-title { font-size:12px; color:#7a5838; font-weight:700; padding-left:4px; border-left:2px solid #9a7848; padding-left:6px; }
 .draft-row-cards { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
-.draft-card { background:#e8d8b8; border:1px solid #9a7848; border-radius:2px; padding:6px 8px;
-  min-width:56px; max-width:80px; cursor:pointer; text-align:center; transition:all .15s; position:relative; }
-.draft-card:hover { border-color:#1133aa; transform:scale(1.04); }
-.draft-card.selected { border-color:#8b6200; background:#d8c8a0; box-shadow:0 0 12px #8b620033; }
+.draft-card { background:#e8d8b8; border:1px solid #9a7848; border-radius:2px; padding:8px 8px 6px;
+  min-width:64px; max-width:88px; cursor:pointer; text-align:center; transition:all .15s; position:relative; }
+.draft-card:hover { border-color:#1133aa; transform:scale(1.04); background:#ddd0b0; }
+.draft-card.selected { border:2px solid #7a1a08; background:#d0c0a0; box-shadow:0 2px 10px #7a1a0828; }
+.draft-card.selected::after { content:'✓'; position:absolute; top:3px; right:5px; font-size:10px; font-weight:900; color:#7a1a08; }
 .draft-card .pick-icon { font-size:18px; }
 .draft-card .pick-name { font-size:13px; }
-.draft-card .pick-desc { font-size:10px; }
+.draft-card .pick-desc { font-size:11px; color:#5a3818; }
 .pick-role { display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:1px; margin:2px 0; letter-spacing:0.5px; }
 .pick-dmgtype { display:inline-block; font-size:8px; padding:1px 4px; border-radius:1px; margin:0 2px 2px; letter-spacing:0.5px; opacity:0.8; }
 #draftStart { margin-top:16px; background:#7a1a08; color:#f5e0c0; border:none; border-radius:2px;
   padding:12px 32px; font-size:16px; font-weight:700; cursor:pointer; transition:all .15s; }
 #draftStart:hover { background:#9a2a10; transform:scale(1.05); }
 #draftStart:disabled { background:#c8b890; color:#7a5838; cursor:not-allowed; transform:none; }
+/* 选将界面返回按钮 + 模式角标 */
+#draftBack { position:absolute; top:10px; left:12px; background:none; border:1px solid #9a7848;
+  color:#7a5838; border-radius:2px; padding:5px 14px; font-size:12px; cursor:pointer; font-family:inherit;
+  transition:all .15s; letter-spacing:0.5px; }
+#draftBack:hover { border-color:#7a1a08; color:#7a1a08; background:#7a1a0808; }
+#draftModeTag { position:absolute; top:13px; right:12px; font-size:10px; color:#9a8060; letter-spacing:1px; }
 
 #winOverlay { position:absolute; inset:0; background:#ede0c488; display:none; justify-content:center; align-items:center; z-index:20; }
 #winOverlay .win-text { color:#7a1a08; font-size:32px; font-weight:800; text-shadow:0 3px 12px #0001; }
@@ -156,13 +163,19 @@ body { display:flex; flex-direction:column; align-items:center; }
 
 <!-- v1.9.0 模式选择入口（首屏，选择后进入对应模式并初始化几何） -->
 <div id="modeSelectOverlay" style="display:none;position:fixed;inset:0;z-index:80;background:#ede0c4;flex-direction:column;justify-content:center;align-items:center;user-select:none;">
-  <div style="font-size:30px;font-weight:900;color:#7a1a08;letter-spacing:3px;margin-bottom:8px;">六边形 · 翻地塔防</div>
-  <div style="font-size:13px;color:#7a5838;margin-bottom:32px;letter-spacing:1px;">选择对战模式</div>
-  <div style="display:flex;flex-direction:column;gap:16px;width:min(80%,300px);">
-    <button onclick="selectMode(false)" style="background:#7a1a08;color:#f5e0c0;border:2px solid #5a1206;border-radius:6px;padding:18px 0;font-size:20px;font-weight:800;cursor:pointer;letter-spacing:2px;box-shadow:0 4px 12px #0002;">⚔ PvE 守城</button>
-    <button onclick="selectMode(true)" style="background:#1a4a2e;color:#f5e0c0;border:2px solid #0e3320;border-radius:6px;padding:18px 0;font-size:20px;font-weight:800;cursor:pointer;letter-spacing:2px;box-shadow:0 4px 12px #0002;">⚔⚔ PvP 占地</button>
+  <div style="font-size:30px;font-weight:900;color:#7a1a08;letter-spacing:3px;margin-bottom:6px;">六边形 · 翻地塔防</div>
+  <div style="font-size:13px;color:#7a5838;margin-bottom:36px;letter-spacing:1px;">选择对战模式</div>
+  <div style="display:flex;flex-direction:column;gap:14px;width:min(80%,300px);">
+    <button onclick="selectMode(false)" style="background:#7a1a08;color:#f5e0c0;border:2px solid #5a1206;border-radius:4px;padding:16px 0 14px;cursor:pointer;box-shadow:0 4px 16px #0003;display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;transition:all .15s;" onmouseover="this.style.background='#9a2a10'" onmouseout="this.style.background='#7a1a08'">
+      <span style="font-size:20px;font-weight:800;letter-spacing:2px;">⚔ PvE 守城</span>
+      <span style="font-size:11px;font-weight:400;opacity:0.75;letter-spacing:0.5px;">独自守城 · 15波兵潮 · BOSS强袭</span>
+    </button>
+    <button onclick="selectMode(true)" style="background:#1a4a2e;color:#f5e0c0;border:2px solid #0e3320;border-radius:4px;padding:16px 0 14px;cursor:pointer;box-shadow:0 4px 16px #0003;display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;transition:all .15s;" onmouseover="this.style.background='#2a6040'" onmouseout="this.style.background='#1a4a2e'">
+      <span style="font-size:20px;font-weight:800;letter-spacing:2px;">⚔⚔ PvP 占地</span>
+      <span style="font-size:11px;font-weight:400;opacity:0.75;letter-spacing:0.5px;">对抗AI · 3分钟抢占领地 · 拆基地胜</span>
+    </button>
   </div>
-  <div style="font-size:11px;color:#9a8060;margin-top:28px;">PvE：守城 15 波 · PvP：3 分钟占地对决</div>
+  <div style="font-size:11px;color:#9a8060;margin-top:28px;letter-spacing:0.5px;">点击模式即可开始选将</div>
 </div>
 
 <div id="tune">
@@ -212,6 +225,8 @@ body { display:flex; flex-direction:column; align-items:center; }
   <div id="mergeHint">选择合成目标（点同种同级建筑）· 点此取消</div>
   <div id="pickOverlay"><div id="pickTitle"></div><div id="pickOptions"></div></div>
   <div id="draftOverlay">
+    <button id="draftBack" onclick="draftGoBack()">◀ 返回</button>
+    <span id="draftModeTag"></span>
     <div id="draftTitle">选择武将阵容</div>
     <div id="draftDesc">进攻2位 + 防守2位，共4将出征</div>
     <div id="draftGrid"></div>
@@ -249,6 +264,7 @@ body { display:flex; flex-direction:column; align-items:center; }
     <div class="bp-sep"></div>
     <div class="bp-pow-lbl">金币</div>
     <div class="bp-pow-val" id="goldHudEl">0</div>
+    <span id="mineHudGroup" style="display:none"><div class="bp-sep"></div><div class="bp-pow-lbl">矿</div><div class="bp-pow-val" id="mineHudEl" style="color:#8b6200">0/5</div></span>
     <div class="bp-sep"></div>
     <div class="bp-sum-lbl">召唤</div>
     <div class="bp-sum-val" id="summonEl">0</div>
@@ -308,6 +324,7 @@ const GENERALS = {
     { key:'caoren',   name:'曹仁',  category:'advance', dmgType:'物理', glyph:'⚔曹', desc:'嘲讽反伤',   role:'护盾', roleColor:'#1133aa', dpsMul:1.5, spdMul:1.0, projSize:4, taunt:true, reflect:0.3 },
     { key:'dianwei',  name:'典韦',  category:'advance', dmgType:'法术', glyph:'⚔典', desc:'格位灼烧光环', role:'灼烧', roleColor:'#cc4400', dpsMul:3.0, spdMul:1.2, projSize:5, burnAura:true },
     { key:'lubu',     name:'吕布',  category:'advance', dmgType:'物理', glyph:'⚔布', desc:'铁骑冲阵',   role:'冲阵', roleColor:'#aa1100', dpsMul:4.0, spdMul:2.2, projSize:7, charge:true },
+    { key:'machao',   name:'马超',  category:'advance', dmgType:'物理', glyph:'⚔马', desc:'破甲冲锋',   role:'破防', roleColor:'#cc8800', dpsMul:3.5, spdMul:1.5, projSize:6, armorBreak:true },
   ],
   defense: [
     { key:'huangzhong', name:'黄忠',  category:'defense', dmgType:'物理', glyph:'◈黄', desc:'极远狙击',  role:'狙击', roleColor:'#335599', dpsMul:4.0, rangeRing:5, spdMul:0.6, projSize:5 },
@@ -316,6 +333,7 @@ const GENERALS = {
     { key:'simayi',     name:'司马懿',category:'defense', dmgType:'法术', glyph:'◈司', desc:'天命雷暴',  role:'雷暴', roleColor:'#7733cc', dpsMul:2.5, rangeRing:3, spdMul:1.0, projSize:5, storm:true },
     { key:'taishici',   name:'太史慈',category:'defense', dmgType:'物理', glyph:'◈太', desc:'穿透急射',  role:'速射', roleColor:'#228844', dpsMul:3.0, rangeRing:4, spdMul:1.8, projSize:4 },
     { key:'pangtong',   name:'庞统',  category:'defense', dmgType:'法术', glyph:'◈庞', desc:'连环雷击',  role:'连环', roleColor:'#2288aa', dpsMul:2.0, rangeRing:3, spdMul:0.85, projSize:5, chain:4, chainDecay:0.8, chainFarthest:true, chainColor:0x66ccff },
+    { key:'xunyu',      name:'荀彧',  category:'defense', dmgType:'真伤', glyph:'◈荀', desc:'击杀聚财·散金破敌', role:'聚财', roleColor:'#d4a017', dpsMul:2.5, rangeRing:3, spdMul:0.9, projSize:5, harvest:true },
     { key:'xuchu',      name:'许褚',  category:'defense', dmgType:'物理', glyph:'◈许', desc:'击晕控制',  role:'控制', roleColor:'#2244aa', dpsMul:2.5, rangeRing:3, spdMul:0.8, projSize:5, stun:0.3, disabled:true },
   ],
 };
@@ -451,6 +469,14 @@ const GENERAL_UPGRADES = {
     { key:'lubu_morale', name:'吕布·无双', desc:'吕布与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='lubu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
+  machao: [
+    { key:'machao_a', name:'马超·西凉铁骑', desc:'破甲增伤+30%→+45%，破甲持续时间+2秒', icon:'🔥',
+      apply: g=>{ g.armorBreakMul_machao=1.45; g.armorBreakDur_machao=6000; }},
+    { key:'machao_b', name:'马超·龙胆枪', desc:'每3击发动「枪刺」：×3真实伤害并刷新破甲计时', icon:'⚔',
+      apply: g=>{ g.lance_machao=true; }},
+    { key:'machao_morale', name:'马超·英烈', desc:'马超与亲兵普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='machao') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
+  ],
   pangtong: [
     { key:'pangtong_a', name:'庞统·落凤', desc:'连锁命中处触发1格范围爆炸，爆炸造成50%伤害', icon:'💥',
       apply: g=>{ g.boltExplode_pangtong=true; }},
@@ -458,6 +484,14 @@ const GENERAL_UPGRADES = {
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='pangtong') cell.general=Object.assign({},cell.general,{chain:8}); }},
     { key:'pangtong_morale', name:'庞统·凤鸣', desc:'庞统普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
       applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='pangtong') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
+  ],
+  xunyu: [
+    { key:'xunyu_a', name:'荀彧·驱虎吞狼', desc:'散金爆发系数0.15→0.40，AOE范围扩至2环（19格）', icon:'💥',
+      apply: g=>{ g.xunyuBlastMul=0.40; g.xunyuBlastRing=2; }},
+    { key:'xunyu_b', name:'荀彧·广积粮', desc:'获金倍率×1.5→×2.5；残血(<30%)敌人爆发×2斩杀', icon:'💎',
+      apply: g=>{ g.xunyuGoldMul=2.5; g.xunyuExecute=true; }},
+    { key:'xunyu_morale', name:'荀彧·王佐', desc:'荀彧普通攻击+60%（可叠加）', icon:'⚡', stackable:true,
+      applyCell: (cell,g)=>{ if(cell.general&&cell.general.key==='xunyu') cell.general=Object.assign({},cell.general,{dpsMul:cell.general.dpsMul+0.6}); }},
   ],
 };
 
@@ -860,6 +894,12 @@ function showModeSelect(){
   if(ov) ov.style.display = 'flex';
 }
 
+function draftGoBack(){
+  document.getElementById('draftOverlay').style.display = 'none';
+  inDraft = false;
+  showModeSelect();
+}
+
 function selectMode(isPvp){
   PVP_MODE = !!isPvp;
   modeSelecting = false;
@@ -899,6 +939,7 @@ function startGame(){
   { const _eHpTopBar=document.getElementById('enemyHpTopBar'); if(_eHpTopBar) _eHpTopBar.style.display=PVP_MODE?'flex':'none'; }
   if(_matchTimerEl){ _matchTimerEl.style.display=PVP_MODE?'block':'none'; _matchTimerEl.textContent='3:00'; _matchTimerEl.style.color='#f5e0c0'; }
   { const _thc=document.getElementById('terrHudCard'); if(_thc) _thc.style.display=PVP_MODE?'flex':'none'; }
+  { const _mhg=document.getElementById('mineHudGroup'); if(_mhg) _mhg.style.display=PVP_MODE?'contents':'none'; }  // 矿数读出仅 PvP 显示（PvE 无矿，display:contents 让3子项融入底栏flex）
   document.getElementById('mergeHint').style.display='none';
   document.getElementById('gameOverlay').style.display='none';
   document.getElementById('pickOverlay').style.display='none';
@@ -953,6 +994,8 @@ function showDraft(){
   updateBtn();
   btn.onclick = () => { overlay.style.display='none'; beginCombat(); };
   overlay.style.display = 'flex';
+  const modeTag = document.getElementById('draftModeTag');
+  if(modeTag) modeTag.textContent = PVP_MODE ? '⚔⚔ PvP 占地' : '⚔ PvE 守城';
 }
 
 function beginCombat(){
@@ -1520,12 +1563,16 @@ function unlockRing(){
   }
 }
 
-// ===== 伤害减免（物法软克制，-40%非免疫；真伤无视） =====
-function resDmg(dmg, dmgType, armType){
-  if(!armType || armType==='normal') return dmg;
-  if(armType==='heavy'  && dmgType==='物理') return dmg * 0.6;
-  if(armType==='shield' && dmgType==='法术') return dmg * 0.6;
-  return dmg;
+// ===== 伤害减免（物法软克制，-40%非免疫；真伤无视；破甲+30%） =====
+function resDmg(dmg, dmgType, armType, enemy){
+  let d = dmg;
+  if(armType && armType!=='normal'){
+    if(armType==='heavy'  && dmgType==='物理') d *= 0.6;
+    if(armType==='shield' && dmgType==='法术') d *= 0.6;
+  }
+  if(enemy && enemy._armorBreakUntil && performance.now() < enemy._armorBreakUntil && dmgType==='物理')
+    d *= (enemy._armorBreakMul || 1.3);
+  return d;
 }
 
 // ===== 敌人 =====
@@ -2436,7 +2483,8 @@ function tick(dt){
           }
 
           spawnProjectile(cell.px, cell.py, tgt.x, tgt.y, projColor, projSize, mingdiMaxLife);
-          finalDmg = resDmg(finalDmg, gen&&gen.dmgType, tgt.armType); // 物法软克制
+          finalDmg = resDmg(finalDmg, gen&&gen.dmgType, tgt.armType, tgt); // 物法软克制（真伤无视）+ 破甲加成
+          const _xunyuPreHpPct = tgt.maxHp > 0 ? tgt.hp / tgt.maxHp : 1; // 荀彧残血斩杀判断
           tgt.hp -= finalDmg;
           trackDmg(cell.building, gen&&gen.name, finalDmg);
 
@@ -2591,7 +2639,40 @@ function tick(dt){
 
           if(tgt.hp<=0){
             const idx=enemies.indexOf(tgt);
-            if(idx>=0){spawnFloat(tgt.x,tgt.y-12,gen?gen.name+'击破':'击破',0x8b6200);removeEnemy(idx);}
+            if(idx>=0){
+              // 荀彧「输筹」：击杀聚财 + 散金破敌AOE（真伤，无视抗性，不触发二次收割）
+              if(gen && gen.harvest && !tgt.isBoss){
+                const baseDrop = (tgt.waveType && GOLD_PER_KILL[tgt.waveType]) ? Math.round(waveCount*GOLD_PER_KILL[tgt.waveType]*TUNE.goldMul) : 0;
+                const goldMul = globalBuffs.xunyuGoldMul || 1.5;
+                const extraGold = Math.round(baseDrop * goldMul);
+                if(extraGold > 0){ gold+=extraGold; goldEarned+=extraGold; spawnFloat(tgt.x,tgt.y-22,'+'+extraGold+'💰',0xd4a017); updateHUD(); }
+                const blastMul = globalBuffs.xunyuBlastMul || 0.15;
+                const blastRing = globalBuffs.xunyuBlastRing || 1;
+                const executeBonus = (globalBuffs.xunyuExecute && _xunyuPreHpPct < 0.3) ? 2 : 1;
+                const blastDmg = Math.round(extraGold * blastMul * executeBonus);
+                if(blastDmg > 0){
+                  const _xhc=pixelToHexCenter(tgt.x,tgt.y);
+                  const _xg=new PIXI.Graphics(); projC.addChild(_xg);
+                  for(const o of hexDiskOffsets(blastRing)){
+                    _xg.lineStyle(0); _xg.beginFill(0xd4a017,0.30);
+                    _xg.drawPolygon(hexPoly(_xhc.x+o.dx,_xhc.y+o.dy,HEX_SIZE-2)); _xg.endFill();
+                    _xg.lineStyle(2,0xffd700,0.85); _xg.drawPolygon(hexPoly(_xhc.x+o.dx,_xhc.y+o.dy,HEX_SIZE-2)); _xg.lineStyle(0);
+                  }
+                  addFadeAnim(projC,_xg,320);
+                  if(executeBonus>1) spawnFloat(tgt.x,tgt.y-16,'斩杀x2',0xffd700);
+                  for(let bi=enemies.length-1;bi>=0;bi--){
+                    const be=enemies[bi]; if(be===tgt) continue;
+                    if(hexDistance(tgt.x,tgt.y,be.x,be.y)<=blastRing){
+                      be.hp-=blastDmg; trackDmg('xunyu','荀彧',blastDmg);
+                      spawnFloat(be.x,be.y-10,blastDmg+'💰',0xd4a017);
+                      if(be.hp<=0){spawnFloat(be.x,be.y-12,'散金破敌',0xd4a017);removeEnemy(bi);}else{updateEnemyHP(be);}
+                    }
+                  }
+                }
+              }
+              const finalIdx=enemies.indexOf(tgt);
+              if(finalIdx>=0){spawnFloat(tgt.x,tgt.y-12,gen?gen.name+'击破':'击破',0x8b6200);removeEnemy(finalIdx);}
+            }
           } else { updateEnemyHP(tgt); }
         }
     }
@@ -2707,8 +2788,8 @@ function tick(dt){
       if(PVP_MODE){
         t.rallying = false; // PvP：立即解除集结，向敌方基地推进
       } else if(enemies.length>0){
-        const alertR = HEX_SIZE * 6; // 3圈警戒半径
-        if(enemies.some(e=>Math.sqrt((e.x-t.x)**2+(e.y-t.y)**2)<alertR)) t.rallying=false;
+        const alertRings = 6; // 6格警戒环；原 HEX_SIZE*6 是欧式像素圆(192px)，侧路集结兵(rallyX=侧路)够不到中路汇聚的攻城敌→永不解除集结→"不寻敌"
+        if(enemies.some(e=>hexDistance(e.x,e.y,t.x,t.y) <= alertRings)) t.rallying=false;
         else {
           // 无近敌：仍向集结点前进，不追击远敌
           const rdx=t.rallyX-t.x, rdy=t.rallyY-t.y;
@@ -2819,7 +2900,7 @@ function tick(dt){
     // 赵云「七进七出」：亲兵攻速×1.5 → 攻击间隔缩短
     const troopAtkInterval = (t.gen && t.gen.key==='zhaoyun' && globalBuffs.troopAtkSpd_zhaoyun) ? Math.round(400/globalBuffs.troopAtkSpd_zhaoyun) : 400;
 
-    if(tdist>14){
+    if(tdist > (PVP_MODE ? 24 : 14)){    // PvP 接战阈值放宽到 24px：双方 size≈8 的兵体接触约 16px>14，会卡在"移动"分支抖动不进攻击分支→发呆不打；PvE 保持 14 不回归
       const _cg = PVP_MODE ? pvpDetourGoal(t,nearest.x,nearest.y) : {x:nearest.x,y:nearest.y};  // PvP 追击对岸敌人过水绕行
       const _twp=nextStepCenter(t.x,t.y,_cg.x,_cg.y);
       const _wdx=_twp.x-t.x, _wdy=_twp.y-t.y, _wl=Math.hypot(_wdx,_wdy)||1;
@@ -2849,7 +2930,25 @@ function tick(dt){
         if(dragonLance) spawnFloat(nearest.x, nearest.y-20, '龙胆！', 0x44ddff);
 
         const _tDmgType = t.dmgType || '物理';   // 由 pushTroop 从将身派生，Lv1-3 亲兵也带正确物/法类型
-        nearest.hp -= resDmg(troopDmg, _tDmgType, nearest.armType);
+        nearest.hp -= resDmg(troopDmg, _tDmgType, nearest.armType, nearest);
+        // 马超「破甲冲锋」：每击标记破甲，物理伤害+30%（西凉铁骑→+45%/持续6s）；龙胆枪每3击枪刺×3
+        if(t.genKey==='machao' || (t.gen&&t.gen.key==='machao')){
+          const _abDur = globalBuffs.armorBreakDur_machao || 4000;
+          const _abMul = globalBuffs.armorBreakMul_machao || 1.3;
+          const _abPrev = nearest._armorBreakUntil && tnow < nearest._armorBreakUntil;
+          nearest._armorBreakUntil = tnow + _abDur;
+          nearest._armorBreakMul = _abMul;
+          if(!_abPrev) spawnFloat(nearest.x, nearest.y-16, '破甲', 0xff8800);
+          t._machaoLanceCnt = (t._machaoLanceCnt||0)+1;
+          if(globalBuffs.lance_machao && t._machaoLanceCnt%3===0 && nearest.hp>0){
+            const _lanceDmg = resDmg(troopDmg*3, '物理', nearest.armType, nearest);
+            nearest.hp -= _lanceDmg; trackDmg(t.srcKey, t.srcName, _lanceDmg);
+            spawnFloat(nearest.x, nearest.y-22, '枪刺！', 0xff8800);
+            nearest._armorBreakUntil = tnow + _abDur;
+            if(nearest.hp<=0){const _li=enemies.indexOf(nearest);if(_li>=0){spawnFloat(nearest.x,nearest.y-14,'破甲斩',0xff8800);removeEnemy(_li);}}
+            else updateEnemyHP(nearest);
+          }
+        }
         // 赵云「铁血」：普攻偷血25%（龙胆大伤=大回血，A+C自然联动）
         if(t.gen && t.gen.key==='zhaoyun'){
           const healAmt=Math.round(troopDmg*0.25);
@@ -3235,7 +3334,7 @@ function spawnRallyTroop(cell, dmg){
   const size=isMaxLvl?(gen.projSize||6)+2:5;
   const hp=bt.dps*meleeScale(cell.lvl)*(isMaxLvl&&gen?gen.dpsMul:1)*2.5*(isMaxLvl?2:1);
   const cont=new PIXI.Container();
-  const body=new PIXI.Graphics(); body.beginFill(isMaxLvl?0x8b6200:bt.hex,0.65); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
+  const body=new PIXI.Graphics(); body.beginFill(isMaxLvl?0x8b6200:bt.hex); body.drawCircle(0,0,size); body.endFill(); cont.addChild(body);
   const ring=new PIXI.Graphics(); ring.lineStyle(1.5,0x88ddff,0.7); ring.drawCircle(0,0,size+2); cont.addChild(ring);
   if(gen){ const iconGfx=new PIXI.Graphics(); drawWeaponIcon(iconGfx,gen.key,size); cont.addChild(iconGfx); }
   const hpBg=new PIXI.Graphics(); hpBg.beginFill(0x222); hpBg.drawRect(-8,-size-6,16,3); hpBg.endFill(); cont.addChild(hpBg);
